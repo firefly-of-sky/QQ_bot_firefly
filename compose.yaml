@@ -1,0 +1,26 @@
+services:
+  napcat:
+    image: ${NAPCAT_IMAGE:-mlikiowa/napcat-docker:latest}
+    restart: unless-stopped
+    environment:
+      MODE: ws
+      WEBUI_TOKEN: ${WEBUI_TOKEN:?Please configure WEBUI_TOKEN in .env}
+    ports:
+      - "127.0.0.1:6099:6099"
+    volumes:
+      - ./data/qq:/app/.config/QQ
+      - ./data/napcat:/app/napcat/config
+      - ./data/plugins:/app/napcat/plugins
+  bot:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      ONEBOT_URL: ws://napcat:3001
+    volumes:
+      - ./config.toml:/app/config.toml:ro
+      - bot-data:/data
+    depends_on:
+      - napcat
+volumes:
+  bot-data:

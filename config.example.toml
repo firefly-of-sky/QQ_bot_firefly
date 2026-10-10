@@ -1,0 +1,20 @@
+default_model = "primary"
+system_prompt = "你是一位友善、准确的中文助手。回答清楚直接；不确定时明确说明。"
+history_turns = 20
+max_input_chars = 8000
+# Conservative UTF-8 byte budget, not an exact provider tokenizer count.
+context_budget_bytes = 48000
+max_output_tokens = 2048
+reply_chunk_chars = 1500
+request_timeout_seconds = 90
+
+[models.primary]
+# Base URL including /v1 if required; do not include /chat/completions.
+base_url = "https://your-provider.example/v1"
+model = "your-exact-model-id"
+api_key_env = "PRIMARY_API_KEY"
+
+# [models.secondary]
+# base_url = "https://another-provider.example/v1"
+# model = "another-model-id"
+# api_key_env = "SECONDARY_API_KEY"
