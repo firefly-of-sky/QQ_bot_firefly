@@ -208,6 +208,12 @@ class NetworkTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await llm.complete(model, messages(config(), [], "hello")), "reply")
         self.assertEqual(received[0]["model"], "test-model")
         self.assertFalse(received[0]["stream"])
+        vision = messages(config(), [], "看图", ["data:image/png;base64,dGVzdA=="])
+        self.assertEqual(await llm.complete(model, vision), "reply")
+        self.assertEqual(received[-1]["messages"][-1]["content"][1]["type"], "image_url")
+        status = 400
+        with self.assertRaisesRegex(ModelError, "未接受图片"):
+            await llm.complete(model, vision)
         for status, expected in [(401, "鉴权"), (403, "鉴权"), (429, "受限"), (500, "HTTP 500")]:
             with self.assertRaisesRegex(ModelError, expected):
                 await llm.complete(model, [])

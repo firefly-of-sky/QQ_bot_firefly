@@ -7,12 +7,17 @@ context_budget_bytes = 48000
 max_output_tokens = 2048
 reply_chunk_chars = 1500
 request_timeout_seconds = 90
+max_images = 4
+max_image_bytes = 5242880
+image_timeout_seconds = 30
 
 [models.primary]
 # Base URL including /v1 if required; do not include /chat/completions.
 base_url = "https://your-provider.example/v1"
 model = "your-exact-model-id"
 api_key_env = "PRIMARY_API_KEY"
+# Requires a provider/model that accepts image_url content parts.
+supports_images = true
 
 # [models.secondary]
 # base_url = "https://another-provider.example/v1"

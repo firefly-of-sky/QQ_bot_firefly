@@ -1,6 +1,6 @@
 # QQbot：私人 QQ 模型助手
 
-使用单独的 QQ 号接收你的私聊，通过可配置的 Chat Completions 兼容 API 回答。第一版支持连续对话、多个模型、模型切换、清空会话、重启恢复。群聊、图片、文件、语音和联网搜索暂未启用。
+使用单独的 QQ 号接收你的私聊，通过可配置的 Chat Completions 兼容 API 回答。当前 v0.2.0 支持连续对话、图片识别、多个模型、模型切换、清空会话、重启恢复。群聊、文件、语音和联网搜索暂未启用。
 
 消息路径：你的 QQ → 机器人 QQ / NapCat → Python 聊天服务 → 模型 API → QQ 回复。
 
@@ -41,7 +41,7 @@ api_key_env = "PRIMARY_API_KEY"
 
 `base_url` 应是接口前缀：程序会在后面加 `/chat/completions`。有的服务商前缀不是 `/v1`，按其文档填写，不要机械增加 `/v1`。`api_key_env` 是环境变量名，不是密钥本身。
 
-第一版发送 `model`、`messages`、`max_tokens`、`stream=false`。要求接口返回 `choices[0].message.content` 文本。仅支持原生 Responses、Anthropic Messages 或 Gemini 协议的端点不能直接填入；只接受 `max_completion_tokens` 等特殊参数的模型也需要后续适配。
+程序发送 `model`、`messages`、`max_tokens`、`stream=false`。文字消息使用字符串 content，图片消息使用 text 与 image_url 内容数组，图片通过 Base64 Data URL 传入。要求接口返回 `choices[0].message.content` 文本。仅支持原生 Responses、Anthropic Messages 或 Gemini 协议的端点不能直接填入；只接受 `max_completion_tokens` 等特殊参数的模型也需要后续适配。
 
 ## 2. 先验证模型
 
@@ -96,7 +96,7 @@ docker compose logs -f bot
 3. `/reset`：确认当前问答记录清空。
 4. `/models`：查看模型别名；添加第二个模型后可用 `/model secondary` 切换。
 5. 再聊一轮，执行 `docker compose restart bot`，发 `/status` 并继续提问：检查重启恢复。
-6. 用其他账号或在群里发送消息：应不回复。发图片或语音：应提示只支持纯文字。
+6. 用其他账号或在群里发送消息：应不回复。发 JPG/PNG 图片：应识别图片；发语音：应提示暂不支持。
 
 | 命令 | 功能 |
 | --- | --- |
@@ -106,7 +106,33 @@ docker compose logs -f bot
 | `/reset` | 删除当前已保存问答，保留模型选择 |
 | `/status` | 查看当前模型和保存的问答轮数 |
 
-以 `/` 开头的消息按命令解析；命令不会发送给模型。群消息、非主人消息、机器人自身消息、临时会话都忽略。须已互加好友，好友私聊才会处理。
+纯文字中以 `/` 开头的消息按命令解析；命令不会发送给模型。图文混合消息整体视为提问，不执行命令。群消息、非主人消息、机器人自身消息、临时会话都忽略。须已互加好友，好友私聊才会处理。
+
+## 图片识别（v0.2.0）
+
+可以直接发送一张图片，机器人默认描述内容并读取清晰文字；也可以在**同一条消息**里发送图片和“读出截图中的报错”“比较这几张图”等问题。分开发送的问题会参考上一轮文字分析，不会重新上传上一张原图。
+
+- 默认支持 JPG、PNG、WebP；每条最多 4 张，每张下载体积不超过 5 MiB，单张下载超时 30 秒。不支持 GIF、闪照、语音、视频、文件附件、转发或引用消息中的图片。
+- 需要模型及服务商支持 Chat Completions 的 `image_url` 图片输入和 Base64 Data URL。`supports_images = true` 默认开启请求能力，并不保证服务商支持。纯文字模型可在对应 `[models.别名]` 下设置 `supports_images = false`，或通过 `/model` 切换视觉模型。`/models` 显示的是配置状态。
+- 程序只下载 QQ 媒体域名（`qpic.cn`、`qq.com`、`qq.com.cn`、`gtimg.cn` 及其子域名）的 HTTP(S) 图片，不读取本地路径，不跟随重定向。下载连接不携带模型密钥、不使用环境代理，避免转发认证信息。
+- 图片内容会发送给当前模型服务商；聊天数据库只保存提问、图片数量说明和模型文字回答，不保存图片、Base64 或临时链接。QQ/NapCat 自身的图片缓存不受此规则控制。后续可围绕分析结果追问，要重新检查图片细节请再次发图。
+- 图片大小与张数限制独立于文字上下文字节预算；视觉 token 计费和模型窗口限制取决于服务商。图片失败时不调用模型、不写入该轮上下文；模型拒绝图片时显示检查视觉能力或缩小图片的提示。
+
+旧版 `config.toml` 无需改动即可使用默认图片设置。若要调整，将以下参数放在文件顶部、任何 `[models.*]` 表之前：
+
+```toml
+max_images = 4
+max_image_bytes = 5242880
+image_timeout_seconds = 30
+```
+
+更新服务：
+
+```bash
+docker compose up -d --build bot
+```
+
+这会重建聊天容器，保留数据库和 NapCat 登录状态。更新完成后，给机器人直接发一张普通截图；只在配置支持的服务商模型上才能成功识别。
 
 ## 添加模型与调整体验
 
@@ -173,4 +199,4 @@ python3 -m venv .venv
 docker compose run --rm --no-deps -v "$PWD/tests:/app/tests:ro" -v "$PWD/scripts:/app/scripts:ro" bot python -m unittest discover -s tests -v
 ```
 
-当前已通过本机 Python 3.14 的 14 项测试。尚未验证 Docker 构建、Python 3.12 容器运行和真实 QQ/API：需要 Docker 就绪、扫码及有效 API 配置后完成上述验收。
+v0.1.0 的真实文字聊天已由用户验证。v0.2.0 已通过本机 Python 3.14 和 Docker Python 3.12 的 23 项测试，并通过当前模型 API 的红蓝色块图片识别测试（正确返回左红右蓝）。图片版测试覆盖图片解析、多图、模型请求格式、下载失败/超时/超限、权限过滤、纯文字模型拒绝和历史记录不保留图片。实际 QQ 图片链路需要用手机发送一张图片完成验收。

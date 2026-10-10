@@ -10,7 +10,8 @@ class ModelError(Exception):
     pass
 
 
-def messages(cfg: Config, history: list[tuple[str, str]], text: str) -> list[dict]:
+def messages(cfg: Config, history: list[tuple[str, str]], text: str,
+             images: list[str] | None = None) -> list[dict]:
     def cost(value: str) -> int:
         return len(value.encode("utf-8")) + 32
     used = cost(cfg.system_prompt) + cost(text)
@@ -26,7 +27,11 @@ def messages(cfg: Config, history: list[tuple[str, str]], text: str) -> list[dic
     result = [{"role": "system", "content": cfg.system_prompt}]
     for user, assistant in reversed(selected):
         result.extend([{"role": "user", "content": user}, {"role": "assistant", "content": assistant}])
-    result.append({"role": "user", "content": text})
+    content = text
+    if images:
+        content = [{"type": "text", "text": text}] + [
+            {"type": "image_url", "image_url": {"url": url}} for url in images]
+    result.append({"role": "user", "content": content})
     return result
 
 
@@ -48,6 +53,8 @@ class LLM:
                     raise ModelError("模型鉴权失败，请检查 API 密钥和权限。")
                 if response.status == 429:
                     raise ModelError("模型请求受限，请稍后重试或检查额度。")
+                if response.status in (400, 413, 415, 422) and any(isinstance(m.get("content"), list) for m in conversation):
+                    raise ModelError(f"模型未接受图片请求（HTTP {response.status}）。请确认模型和接口支持 image_url 图片输入，或缩小图片后重试。")
                 if response.status != 200:
                     raise ModelError(f"模型服务请求失败（HTTP {response.status}），请检查配置或稍后重试。")
                 data = await response.json()
