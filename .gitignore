@@ -7,6 +7,3 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 .DS_Store
-mac-chat-export/runtime/
-mac-chat-export/build/
-mac-chat-export/output/
