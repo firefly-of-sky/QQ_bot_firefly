@@ -10,11 +10,15 @@ class ModelError(Exception):
     pass
 
 
+QQ_STYLE = "\n\n输出用于 QQ 普通文字消息：优先使用简短段落和编号列表，避免 Markdown 标题、加粗和表格；代码仍可用代码块表达，保持代码和公式准确。"
+
+
 def messages(cfg: Config, history: list[tuple[str, str]], text: str,
              images: list[str] | None = None) -> list[dict]:
     def cost(value: str) -> int:
         return len(value.encode("utf-8")) + 32
-    used = cost(cfg.system_prompt) + cost(text)
+    system_prompt = cfg.system_prompt + QQ_STYLE
+    used = cost(system_prompt) + cost(text)
     if used > cfg.context_budget_bytes:
         raise ModelError("消息超过当前上下文预算，请缩短内容。")
     selected = []
@@ -24,7 +28,7 @@ def messages(cfg: Config, history: list[tuple[str, str]], text: str,
             break
         selected.append((user, assistant))
         used += size
-    result = [{"role": "system", "content": cfg.system_prompt}]
+    result = [{"role": "system", "content": system_prompt}]
     for user, assistant in reversed(selected):
         result.extend([{"role": "user", "content": user}, {"role": "assistant", "content": assistant}])
     content = text

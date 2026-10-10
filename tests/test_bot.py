@@ -11,7 +11,7 @@ from aiohttp import web
 
 from qqbot.bot import Bot, split_reply
 from qqbot.config import Config, Model, load
-from qqbot.llm import LLM, ModelError, messages
+from qqbot.llm import LLM, ModelError, QQ_STYLE, messages
 from qqbot.onebot import DeliveryError, OneBot
 from qqbot.store import Store
 from scripts.init_config import initialize
@@ -138,9 +138,9 @@ class StoreAndContextTests(unittest.TestCase):
             store.close()
 
     def test_budget_complete_pairs_and_unicode(self):
-        cfg = replace(config(), system_prompt="s", context_budget_bytes=136)
+        cfg = replace(config(), system_prompt="s", context_budget_bytes=136 + len(QQ_STYLE.encode("utf-8")))
         result = messages(cfg, [("old", "old"), ("u", "a")], "你")
-        self.assertEqual([m["content"] for m in result], ["s", "u", "a", "你"])
+        self.assertEqual([m["content"] for m in result], ["s" + QQ_STYLE, "u", "a", "你"])
         with self.assertRaises(ModelError):
             messages(replace(cfg, context_budget_bytes=1), [], "你")
         result = messages(config(), [(str(i), "a") for i in range(30)], "last")

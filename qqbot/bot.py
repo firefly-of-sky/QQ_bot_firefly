@@ -2,6 +2,7 @@ import asyncio
 import logging
 
 from .config import Config
+from .formatting import to_plain_text
 from .images import ImageError, ImageLoader, parse_message
 from .llm import ModelError, messages
 from .onebot import DeliveryError
@@ -86,7 +87,7 @@ class Bot:
             except (ModelError, ImageError) as exc:
                 await self.reply(str(exc))
                 return
-            await self.reply(answer)
+            await self.reply(to_plain_text(answer))
             # Only complete, acknowledged deliveries become conversation history.
             saved_text = text
             if image_urls:
