@@ -51,7 +51,7 @@ class BotTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(conversation[1]["content"], "你好")
 
     async def test_unauthorized_group_self_and_temp_ignored(self):
-        for extra in ({"user_id": 999}, {"message_type": "group"}, {"self_id": 123},
+        for extra in ({"user_id": None}, {"message_type": "group"}, {"self_id": 123},
                       {"sub_type": "group"}, {"post_type": "message_sent"}, {"message_id": None}):
             await self.bot.handle(event(**extra))
         self.llm.complete.assert_not_awaited()
@@ -160,7 +160,7 @@ class StoreAndContextTests(unittest.TestCase):
                     with self.assertRaises(ValueError):
                         load()
                 valid = path.read_text()
-                for invalid in ('history_turns=2.5\n', 'request_timeout_seconds=nan\n'):
+                for invalid in ('history_turns=2.5\n', 'request_timeout_seconds=nan\n', 'max_concurrent_requests=0\n', 'requests_per_minute=-1\n'):
                     path.write_text(invalid + valid)
                     with self.assertRaises(ValueError):
                         load()

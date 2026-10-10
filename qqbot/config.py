@@ -32,6 +32,8 @@ class Config:
     max_images: int = 4
     max_image_bytes: int = 5 * 1024 * 1024
     image_timeout_seconds: float = 30
+    max_concurrent_requests: int = 3
+    requests_per_minute: int = 10
 
 
 def load() -> Config:
@@ -49,7 +51,7 @@ def load() -> Config:
         raise ValueError("OWNER_QQ 或 ONEBOT_TOKEN 尚未正确配置")
     if cfg.default_model not in models:
         raise ValueError("default_model 不在 models 中")
-    for field in ("history_turns", "max_input_chars", "context_budget_bytes", "max_output_tokens", "reply_chunk_chars", "max_images", "max_image_bytes"):
+    for field in ("history_turns", "max_input_chars", "context_budget_bytes", "max_output_tokens", "reply_chunk_chars", "max_images", "max_image_bytes", "max_concurrent_requests", "requests_per_minute"):
         value = getattr(cfg, field)
         if type(value) is not int or value <= 0:
             raise ValueError(f"{field} 必须是正整数")

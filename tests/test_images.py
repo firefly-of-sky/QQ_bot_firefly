@@ -96,7 +96,7 @@ class ImageBotTests(unittest.IsolatedAsyncioTestCase):
         models['first'] = replace(models['first'], supports_images=False)
         self.bot.cfg = replace(self.bot.cfg, models=models)
         await self.bot.handle(event(message=[picture()]))
-        await self.bot.handle(event(2, message=[picture()], user_id=999))
+        await self.bot.handle(event(2, message=[picture()], user_id=999, sub_type="other"))
         self.loader.load.assert_not_awaited()
         self.llm.complete.assert_not_awaited()
 
