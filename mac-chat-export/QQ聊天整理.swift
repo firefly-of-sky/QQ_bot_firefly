@@ -7,7 +7,7 @@ final class Delegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 610, height: 440),
                           styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
-        window.title = "QQ 聊天整理 · v0.2"
+        window.title = "QQ 聊天整理 · v0.3"
         window.center()
         let stack = NSStackView()
         stack.orientation = .vertical
@@ -56,6 +56,12 @@ final class Delegate: NSObject, NSApplicationDelegate {
         }
         // The command displays the explicit runtime consent before starting QQ.
         NSWorkspace.shared.open(target)
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        guard urls.contains(where: { $0.scheme == "qqchatarchive" }) else { return }
+        window?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     @objc func openResults() {
