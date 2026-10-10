@@ -4,6 +4,12 @@
 
 消息路径：你的 QQ → 机器人 QQ / NapCat → Python 聊天服务 → 模型 API → QQ 回复。
 
+## Mac 聊天记录归档工具（独立 v0.2.0）
+
+新增独立的 [Mac 使用说明](mac-chat-export/使用说明.md)。双击 `mac-chat-export/build/QQ聊天整理.app`，通过 QCE 批量导出个人 QQ 的 JSON 记录与图片，完成任务自动整理成 `data/<会话>/chat.txt`、`images/` 和 ZIP。该工具不修改机器人服务或机器人账号配置。
+
+当前已通过整理与打包测试、读取组件校验和 Mac 界面检查；真实 QQ 读取仍需用户接受专用 QQ 副本机制并扫码验证。QQbot 的问答数据库不能代替完整的个人 QQ 聊天记录。见 [可行性分析](docs/qq-chat-shortcut-feasibility.md)。
+
 ## 你需要准备
 
 - 一个用于运行机器人的 QQ 号，以及用来向它发消息的个人 QQ 号；两个账号互加好友。
