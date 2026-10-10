@@ -16,5 +16,8 @@ fi
 set +e
 "$TASK_PYTHON" "$TASK_ROOT/launch.py" "$@"
 TASK_STATUS=$?
+if [ "${1:-}" = "--stop" ]; then
+    exit "$TASK_STATUS"
+fi
 read -r -p '运行已结束。按回车关闭。' _
 exit "$TASK_STATUS"

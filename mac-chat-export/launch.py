@@ -13,6 +13,9 @@ import socket
 import subprocess
 import sys
 import time
+from urllib.request import Request, build_opener, ProxyHandler
+
+from lifecycle import owned_processes, single_instance, stop_owned, terminal_lifetime
 
 ROOT = Path(__file__).resolve().parent
 RUNTIME = ROOT / "runtime"
@@ -33,14 +36,49 @@ def check():
         raise ValueError("运行组件尚未解压。")
     if not Path("/Applications/QQ.app").is_dir():
         raise ValueError("请先安装官方 Mac 版 QQ。")
-    for port in (40683, 40684):
+    check_ports()
+
+
+def check_ports(ports=(40683, 40684)):
+    for port in ports:
         with socket.socket() as sock:
+            # A just-closed HTTP connection can remain in TIME_WAIT. QCE's
+            # listener uses address reuse; our preflight must do the same.
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             try:
                 sock.bind(("127.0.0.1", port))
             except PermissionError:
                 raise ValueError("当前运行环境禁止检查本机端口；请在 Mac 终端直接运行环境检查。") from None
             except OSError:
-                raise ValueError(f"端口 {port} 已被占用。请先关闭本工具的上一次运行。") from None
+                raise ValueError(f"端口 {port} 被其他运行程序占用；本工具没有停止该程序。"
+                                 "如是上一次读取，请在应用中点击‘停止读取’后重试。") from None
+
+
+def recover_previous():
+    previous = owned_processes(ROOT)
+    if any(item.role == "controller" for item in previous):
+        print("已有 QQ 读取启动窗口。请返回原窗口，或在应用中点击‘停止读取’后重新启动。")
+        return False
+    if not previous:
+        return True
+    if any(item.role == "server" for item in previous):
+        try:
+            token = json.loads((RUNTIME / "security/security.json").read_text())["accessToken"]
+            request = Request("http://127.0.0.1:40683/api/tasks",
+                              headers={"Authorization": "Bearer " + token})
+            with build_opener(ProxyHandler({})).open(request, timeout=3) as response:
+                payload = json.load(response)
+            if not payload.get("success"):
+                raise ValueError("无法核验任务状态")
+            tasks = payload.get("data", {}).get("tasks", [])
+            if any(task.get("status") not in ("completed", "failed", "cancelled", "canceled")
+                   for task in tasks):
+                raise ValueError("上次读取仍有未完成任务；请等待完成，或点击‘停止读取’中断后重试。")
+        except (OSError, KeyError, json.JSONDecodeError) as exc:
+            raise ValueError("发现上次读取残留，但无法确认任务状态。请点击‘停止读取’后重试。") from exc
+    print("发现启动窗口已退出的残留组件，正在清理……", flush=True)
+    stop_owned(ROOT, previous)
+    return True
 
 
 def security_file():
@@ -81,13 +119,40 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--accept", action="store_true")
+    parser.add_argument("--stop", action="store_true", help="停止本项目的读取和整理进程")
     args = parser.parse_args()
     os.umask(0o077)
     try:
-        check()
+        if args.stop:
+            count = stop_owned(ROOT)
+            print("读取已停止，已生成的归档保留。" if count else "没有正在运行的读取组件。")
+            return
         if args.check:
+            check()
             print("环境检查通过：Apple 芯片、QQ、QCE v6.3.2 校验和本机端口。未启动或登录 QQ。")
             return
+        with single_instance(RUNTIME) as acquired:
+            if not acquired:
+                print("QQ 读取已在运行。请返回原窗口，或在应用中点击‘停止读取’。")
+                return
+            with terminal_lifetime() as closing:
+                if not recover_previous():
+                    return
+                check()
+                run(args, closing)
+    except KeyboardInterrupt:
+        print("\n本次读取已停止。已生成的归档保留。")
+    except EOFError:
+        print("\n启动窗口已关闭，未启动读取。")
+    except (OSError, ValueError) as exc:
+        print(f"无法启动：{exc}", file=sys.stderr)
+        sys.exit(1)
+
+
+def run(args, closing):
+    watcher = None
+    engine = None
+    try:
         if not args.accept:
             print("首次运行说明：本工具使用非官方开源 QCE 读取你的 QQ 聊天记录。\n"
                   "它会创建专用 QQ 副本并重新签名；副本失去 App Sandbox 保护。\n"
@@ -104,30 +169,26 @@ def main():
         env = dict(os.environ)
         env.update({"QCE_SERVER_PORT": "40683", "QCE_BRIDGE_PORT": "40684",
                     "QCE_CONFIG_DIR": str(configuration.parent)})
-        watcher = None
-        engine = None
-        signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt()))
-        try:
-            watcher = subprocess.Popen([sys.executable, str(ROOT / "archive.py"), "--watch",
+        watcher = subprocess.Popen([sys.executable, str(ROOT / "archive.py"), "--watch",
                                         "--security", str(configuration), "--output",
                                         str(ROOT / "output"), "--port", "40683"],
                                        start_new_session=True)
-            engine = subprocess.Popen(["/bin/bash", str(ENGINE / "launcher-user.sh")],
+        engine = subprocess.Popen(["/bin/bash", str(ENGINE / "launcher-user.sh")],
                                       cwd=ENGINE, env=env, start_new_session=True)
-            while engine.poll() is None:
-                if watcher.poll() is not None:
-                    raise ValueError("自动整理程序已停止，请重新启动工具。")
-                time.sleep(0.5)
-            if engine.returncode:
-                raise ValueError("QQ 读取组件启动失败，请查看上方提示（例如桌面 QQ 尚未退出）。")
-        finally:
-            stop_process(engine)
-            stop_process(watcher)
-    except KeyboardInterrupt:
-        print("\n本次读取已停止。已生成的归档保留。")
-    except (OSError, ValueError) as exc:
-        print(f"无法启动：{exc}", file=sys.stderr)
-        sys.exit(1)
+        while engine.poll() is None:
+            if watcher.poll() is not None:
+                raise ValueError("自动整理程序已停止，请重新启动工具。")
+            time.sleep(0.5)
+        if engine.returncode:
+            raise ValueError("QQ 读取组件启动失败，请查看上方提示（例如桌面 QQ 尚未退出）。")
+    finally:
+        closing.set()
+        stop_process(engine)
+        stop_process(watcher)
+        # The upstream child can outlive its launcher; match exact executable
+        # paths and process start times rather than kill by name or port.
+        remaining = [item for item in owned_processes(ROOT) if item.role != "controller"]
+        stop_owned(ROOT, remaining)
 
 
 if __name__ == "__main__":

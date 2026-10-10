@@ -13,7 +13,7 @@ cat > "$TASK_APP/Contents/Info.plist" <<'PLIST'
 <key>CFBundleIdentifier</key><string>local.qqbot.chatarchive</string>
 <key>CFBundleName</key><string>QQ聊天整理</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.3.0</string>
+<key>CFBundleShortVersionString</key><string>0.3.1</string>
 <key>CFBundleURLTypes</key><array><dict>
 <key>CFBundleURLName</key><string>local.qqbot.chatarchive</string>
 <key>CFBundleURLSchemes</key><array><string>qqchatarchive</string></array>
