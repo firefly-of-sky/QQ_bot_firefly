@@ -9,12 +9,14 @@ from .config import load
 from .llm import LLM, ModelError, messages
 from .onebot import OneBot
 from .store import Store
+from .search import Search
 
 
 async def main():
     parser = argparse.ArgumentParser(description="QQ private assistant")
     parser.add_argument("--check-config", action="store_true")
     parser.add_argument("--check-model", metavar="ALIAS", help="Make one billable API test request without connecting QQ")
+    parser.add_argument("--check-search", action="store_true", help="Make one search API connectivity test")
     args = parser.parse_args()
     try:
         cfg = load()
@@ -22,6 +24,13 @@ async def main():
         raise SystemExit("配置无效：请检查 config.toml、OWNER_QQ、ONEBOT_TOKEN 和各模型密钥环境变量。")
     if args.check_config:
         print("配置有效；模型别名：" + ", ".join(cfg.models))
+        return
+    if args.check_search:
+        try:
+            results = await Search(cfg).query("Python 官方文档")
+        except ModelError as exc:
+            raise SystemExit(str(exc))
+        print(f"搜索调用成功，收到 {len(results)} 条带链接的结果。")
         return
     async with aiohttp.ClientSession(trust_env=True) as http:
         llm = LLM(http, cfg)
@@ -41,7 +50,9 @@ async def main():
             async with asyncio.TaskGroup() as group:
                 group.create_task(transport.run(bot.accepts))
                 group.create_task(bot.worker())
+                group.create_task(transport.monitor())
         finally:
+            await bot.close()
             store.close()
 
 

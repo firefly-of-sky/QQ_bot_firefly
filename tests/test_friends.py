@@ -22,6 +22,7 @@ class FriendsTests(unittest.IsolatedAsyncioTestCase):
         self.bot = Bot(config(), self.store, self.llm, self.transport)
 
     async def asyncTearDown(self):
+        await self.bot.close()
         self.store.close()
 
     async def test_all_friends_routed_and_history_isolated(self):
@@ -100,12 +101,13 @@ class FriendsTests(unittest.IsolatedAsyncioTestCase):
         loader = AsyncMock()
         loader.load.return_value = [image_data_url(PNG)]
         self.bot.image_loader = loader
-        await self.bot.handle(event(message=[picture()], user_id=999))
+        await self.bot.handle(event(message=[picture(), {"type": "text", "data": {"text": "看图"}}], user_id=999))
         self.assertEqual(self.transport.send.call_args.args[0], 999)
         self.assertIsInstance(self.llm.complete.call_args.args[1][-1]['content'], list)
         self.llm.complete.side_effect = ModelError('模型超时')
         await self.bot.handle(event(2, user_id=999))
-        self.assertEqual(self.transport.send.call_args.args, (999, '模型超时'))
+        self.assertEqual(self.transport.send.call_args.args[0], 999)
+        self.assertIn('模型超时', self.transport.send.call_args.args[1])
         self.assertEqual(len(self.store.history('private:456:999', 20)), 1)
         self.assertEqual(self.store.history('private:456:123', 20), [])
 

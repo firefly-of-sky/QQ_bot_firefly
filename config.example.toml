@@ -12,6 +12,11 @@ max_image_bytes = 5242880
 image_timeout_seconds = 30
 max_concurrent_requests = 3
 requests_per_minute = 10
+image_wait_seconds = 3
+media_ttl_seconds = 600
+progress_delay_seconds = 12
+auto_search = true
+search_api_key_env = "TAVILY_API_KEY"
 
 [models.primary]
 # Base URL including /v1 if required; do not include /chat/completions.

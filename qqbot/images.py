@@ -46,7 +46,7 @@ def parse_message(message, max_images: int) -> tuple[str, list[str]]:
             if len(images) > max_images:
                 raise ImageError(f"每条消息最多支持 {max_images} 张图片，请分批发送。")
         else:
-            raise ImageError("目前支持文字和图片，请直接发送文字或图片；暂不支持语音、视频、文件和引用消息。")
+            raise ImageError("目前支持文字和图片，请直接发送文字或图片；暂不支持语音、视频和文件。")
     return "".join(texts).strip(), images
 
 

@@ -200,7 +200,7 @@ class NetworkTests(unittest.IsolatedAsyncioTestCase):
                 await asyncio.sleep(0.1)
             if mode == "bad":
                 return web.json_response({"choices": []})
-            return web.json_response({"choices": [{"message": {"content": "reply"}}]}, status=status)
+            return web.json_response({"choices": [{"message": {"content": "reply"}, "finish_reason": "length" if mode == "length" else "stop"}]}, status=status)
 
         url = await self.server(handler, "/v1/chat/completions")
         model = Model(url + "/v1", "test-model", "TEST_KEY")
@@ -217,6 +217,8 @@ class NetworkTests(unittest.IsolatedAsyncioTestCase):
         for status, expected in [(401, "鉴权"), (403, "鉴权"), (429, "受限"), (500, "HTTP 500")]:
             with self.assertRaisesRegex(ModelError, expected):
                 await llm.complete(model, [])
+        status, mode = 200, "length"
+        self.assertIn("达到长度限制", await llm.complete(model, []))
         status, mode = 200, "bad"
         with self.assertRaisesRegex(ModelError, "格式异常"):
             await llm.complete(model, [])

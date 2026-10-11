@@ -63,10 +63,13 @@ class ImageBotTests(unittest.IsolatedAsyncioTestCase):
         self.bot = Bot(config(), self.store, self.llm, self.transport, self.loader)
 
     async def asyncTearDown(self):
+        await self.bot.close()
         self.store.close()
 
     async def test_image_only_and_followup_history_without_image_secrets(self):
         await self.bot.handle(event(message=[picture()]))
+        self.llm.complete.assert_not_awaited()
+        await self.bot.handle(event(10, '请描述图片'))
         content = self.llm.complete.call_args.args[1][-1]['content']
         self.assertIn('描述图片', content[0]['text'])
         self.assertTrue(content[1]['image_url']['url'].startswith('data:image/png;base64,'))
@@ -87,6 +90,7 @@ class ImageBotTests(unittest.IsolatedAsyncioTestCase):
     async def test_failed_download_does_not_call_model_or_persist(self):
         self.loader.load.side_effect = ImageError('QQ 图片下载超时，请稍后重新发送。')
         await self.bot.handle(event(message=[picture()]))
+        await self.bot.handle(event(10, '看图'))
         self.llm.complete.assert_not_awaited()
         self.assertEqual(self.store.history('private:456:123', 20), [])
         self.assertIn('超时', self.transport.send.call_args.args[1])

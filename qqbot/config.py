@@ -34,6 +34,11 @@ class Config:
     image_timeout_seconds: float = 30
     max_concurrent_requests: int = 3
     requests_per_minute: int = 10
+    image_wait_seconds: float = 3
+    media_ttl_seconds: float = 600
+    progress_delay_seconds: float = 12
+    search_api_key_env: str = "TAVILY_API_KEY"
+    auto_search: bool = True
 
 
 def load() -> Config:
@@ -60,6 +65,14 @@ def load() -> Config:
         raise ValueError("request_timeout_seconds 必须为有限正数")
     if not isinstance(cfg.system_prompt, str):
         raise ValueError("system_prompt 必须为文字")
+    for field in ("image_wait_seconds", "media_ttl_seconds", "progress_delay_seconds"):
+        value = getattr(cfg, field)
+        if type(value) not in (int, float) or not math.isfinite(value) or value <= 0:
+            raise ValueError(f"{field} 必须为有限正数")
+    if cfg.media_ttl_seconds <= cfg.image_wait_seconds:
+        raise ValueError("media_ttl_seconds 必须大于 image_wait_seconds")
+    if type(cfg.auto_search) is not bool or not isinstance(cfg.search_api_key_env, str):
+        raise ValueError("搜索配置无效")
     if (type(cfg.image_timeout_seconds) not in (int, float)
             or not math.isfinite(cfg.image_timeout_seconds) or cfg.image_timeout_seconds <= 0):
         raise ValueError("image_timeout_seconds 必须为有限正数")
