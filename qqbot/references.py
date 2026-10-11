@@ -7,9 +7,10 @@ from .onebot import DeliveryError
 
 
 class References:
-    def __init__(self, cfg, transport):
+    def __init__(self, cfg, transport, store=None):
         self.cfg, self.transport = cfg, transport
         self.cache = OrderedDict()
+        self.store = store
 
     def remember(self, session, message_id, message):
         if type(message_id) not in (str, int):
@@ -43,6 +44,8 @@ class References:
         reference = replies[0]['data'].get('id')
         if type(reference) not in (str, int):
             raise ImageError('无法读取这条引用，请重新发送相关内容。')
+        if self.store and self.store.is_recalled(session, reference):
+            raise ImageError("这条引用已经撤回，请重新发送你想讨论的内容。")
         clean = [s for s in message if s not in replies and not (
             isinstance(s, dict) and s.get('type') == 'at' and isinstance(s.get('data'), dict)
             and str(s['data'].get('qq')) == str(self_id))]

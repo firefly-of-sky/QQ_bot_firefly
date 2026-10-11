@@ -276,6 +276,32 @@ class NetworkTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.gather(*tasks, return_exceptions=True)
             store.close()
 
+    async def test_recall_notice_bypasses_full_message_queue(self):
+        notice = {"post_type": "notice", "notice_type": "friend_recall", "self_id": 456,
+                  "user_id": 123, "message_id": 1}
+        async def qq(request):
+            ws = web.WebSocketResponse()
+            await ws.prepare(request)
+            await ws.send_json(notice)
+            async for frame in ws:
+                pass
+            return ws
+        url = await self.server(qq, "/ws")
+        transport = OneBot(self.http, url.replace("http://", "ws://") + "/ws", "token")
+        for _ in range(100):
+            transport.queue.put_nowait(event())
+        received = asyncio.Event()
+        async def recalled(data):
+            self.assertEqual(data, notice)
+            received.set()
+        task = asyncio.create_task(transport.run(lambda data: data == notice, recalled))
+        try:
+            await asyncio.wait_for(received.wait(), 2)
+            self.assertEqual(transport.queue.qsize(), 100)
+        finally:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+
     async def test_disconnect_rejects_inflight_action(self):
         async def qq(request):
             ws = web.WebSocketResponse()

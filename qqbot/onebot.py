@@ -71,7 +71,7 @@ class OneBot:
             elif not future.cancelled():
                 future.exception()  # Retrieve disconnect exceptions if send itself failed.
 
-    async def run(self, accept):
+    async def run(self, accept, on_recall=None):
         delay = 1
         while True:
             try:
@@ -99,6 +99,10 @@ class OneBot:
                         elif event.get("meta_event_type") == "heartbeat":
                             self.update_status(event.get("status"))
                         elif accept(event):
+                            if event.get("notice_type") == "friend_recall" and on_recall:
+                                # Do not let a full chat queue delay cancellation.
+                                await on_recall(event)
+                                continue
                             try:
                                 event["_received_at"] = time.monotonic()
                                 self.queue.put_nowait(event)

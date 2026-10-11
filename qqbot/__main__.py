@@ -48,7 +48,7 @@ async def main():
         bot = Bot(cfg, store, llm, transport)
         try:
             async with asyncio.TaskGroup() as group:
-                group.create_task(transport.run(bot.accepts))
+                group.create_task(transport.run(bot.accepts, bot.recall))
                 group.create_task(bot.worker())
                 group.create_task(transport.monitor())
         finally:

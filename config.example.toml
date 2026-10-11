@@ -17,6 +17,10 @@ media_ttl_seconds = 600
 progress_delay_seconds = 12
 auto_search = true
 search_api_key_env = "TAVILY_API_KEY"
+# Salary questions use up to 3 advanced queries; other searches use one basic query.
+search_max_queries = 3
+search_max_results = 9
+search_timeout_seconds = 45
 
 [models.primary]
 # Base URL including /v1 if required; do not include /chat/completions.

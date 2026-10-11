@@ -3,6 +3,7 @@ import logging
 import time
 import uuid
 from contextlib import suppress
+from dataclasses import replace
 from collections import deque
 from weakref import WeakValueDictionary
 
@@ -14,7 +15,7 @@ from .onebot import DeliveryError
 from .store import Store
 from .progress import ProgressState, ProgressWording, task_kind
 from .references import References
-from .search import Search, needs_search, search_context, strip_search_citations
+from .search import SALARY_RULES, salary_question, Search, needs_search, search_context, strip_search_citations
 
 log = logging.getLogger(__name__)
 HELP = "命令：\n/help 查看帮助\n/reset 清空自己的上下文\n/cancel 取消正在处理及排队的问题\n/search 问题 联网搜索\n/status 查看自己的状态\n可发送文字、图片或同条图文消息。通过好友申请后即可私聊；图片识别需要支持视觉的模型。"
@@ -53,9 +54,10 @@ class Bot:
         self.image_loader = image_loader or ImageLoader(cfg)
         self.search = search or Search(cfg)
         self.progress_wording = ProgressWording(cfg.progress_templates)
-        self.references = References(cfg, transport)
+        self.references = References(cfg, transport, store)
         self.pending_images = {}
         self.active = {}
+        self.jobs = {}
         self.epochs = {}
         self.background = set()
         self.locks = WeakValueDictionary()
@@ -64,6 +66,9 @@ class Bot:
 
     def accepts(self, event: dict) -> bool:
         sender, account = qq_id(event.get("user_id")), qq_id(event.get("self_id"))
+        if (event.get("post_type") == "notice" and event.get("notice_type") == "friend_recall"):
+            return (sender is not None and account is not None and sender != account
+                    and type(event.get("message_id")) in (int, str))
         return (event.get("post_type") == "message"
                 and event.get("message_type") == "private"
                 and event.get("sub_type") == "friend"
@@ -97,11 +102,12 @@ class Bot:
             state[3].cancel()
         return state
 
-    def keep_images(self, session, user_id, urls, quote):
+    def keep_images(self, session, user_id, urls, quote, sources):
         old = self.clear_images(session)
         if old and time.monotonic() - old[2] < self.cfg.media_ttl_seconds:
             urls = list(dict.fromkeys(old[0] + urls))
             quote = quote or old[1]
+            sources.update(old[4])
         if len(urls) > self.cfg.max_images:
             raise ImageError(f"每次最多处理 {self.cfg.max_images} 张图片，请分批重新发送。")
         while len(self.pending_images) >= 100:
@@ -109,7 +115,7 @@ class Bot:
         task = asyncio.create_task(self.ask_image_intent(session, user_id))
         self.background.add(task)
         task.add_done_callback(self.background.discard)
-        self.pending_images[session] = (urls, quote, time.monotonic(), task)
+        self.pending_images[session] = (urls, quote, time.monotonic(), task, set(sources))
 
     async def ask_image_intent(self, session, user_id):
         try:
@@ -128,7 +134,7 @@ class Bot:
                 self.pending_images.pop(session, None)
 
     async def close(self):
-        tasks = list(self.background) + list(self.active.values())
+        tasks = list(self.background) + list(self.active.values()) + [job[1] for job in self.jobs.values()]
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
@@ -146,18 +152,67 @@ class Bot:
             if search_required:
                 state.stage = "search"
                 results = await self.search.query(query)
-                text += search_context(results)
+                text += search_context(results, query, min(18000, self.cfg.context_budget_bytes // 2))
             if urls:
                 state.stage = "image"
             images = await self.image_loader.load(urls) if urls else None
             state.stage = task_kind(query, bool(urls))
             if results and state.stage == "thinking":
                 state.stage = "summary"
-            conversation = messages(self.cfg, history, text, images)
+            message_cfg = self.cfg
+            if results and salary_question(query):
+                message_cfg = replace(self.cfg, system_prompt=self.cfg.system_prompt + SALARY_RULES)
+            conversation = messages(message_cfg, history, text, images)
             answer = await self.llm.complete(self.cfg.models[alias], conversation)
         return strip_search_citations(answer, results) if results else answer
 
+    async def recall(self, event: dict):
+        if not self.accepts(event) or event.get("notice_type") != "friend_recall":
+            return
+        session = f"private:{qq_id(event['self_id'])}:{qq_id(event['user_id'])}"
+        message_id = str(event['message_id'])
+        self.store.recall(session, message_id)
+        self.references.clear(session)
+        pending = self.pending_images.get(session)
+        if pending and message_id in pending[4]:
+            self.clear_images(session)
+        for (job_session, _), (sources, task) in list(self.jobs.items()):
+            if job_session == session and message_id in sources:
+                task.cancel()
+        log.info("Private message recalled; matching work and local context removed")
+
     async def handle(self, event: dict):
+        if not self.accepts(event):
+            return
+        if event.get("notice_type") == "friend_recall":
+            await self.recall(event)
+            return
+        session = f"private:{qq_id(event['self_id'])}:{qq_id(event['user_id'])}"
+        sources = {str(event['message_id'])}
+        raw = event.get('message')
+        if isinstance(raw, list):
+            for segment in raw:
+                if (isinstance(segment, dict) and segment.get('type') == 'reply'
+                        and isinstance(segment.get('data'), dict)):
+                    reference = segment['data'].get('id')
+                    if type(reference) in (str, int):
+                        sources.add(str(reference))
+        if any(self.store.is_recalled(session, source) for source in sources):
+            return
+        key = (session, str(event['message_id']))
+        if key in self.jobs:
+            return
+        task = asyncio.create_task(self._handle(event, sources))
+        self.jobs[key] = (sources, task)
+        try:
+            await task
+        except asyncio.CancelledError:
+            if asyncio.current_task().cancelling():
+                raise
+        finally:
+            self.jobs.pop(key, None)
+
+    async def _handle(self, event: dict, sources):
         if not self.accepts(event):
             return
         user_id = qq_id(event["user_id"])
@@ -193,6 +248,8 @@ class Bot:
         async with lock:
             if epoch != self.epochs.get(session, 0):
                 return
+            if any(self.store.is_recalled(session, source) for source in sources):
+                return
             try:
                 text, image_urls, quote = await self.references.resolve(
                     session, user_id, event['self_id'], raw)
@@ -227,13 +284,14 @@ class Bot:
                 if image_urls and not text:
                     if not self.cfg.models[alias].supports_images:
                         raise ImageError("当前模型已配置为仅支持文字，请联系主人配置支持图片的模型。")
-                    self.keep_images(session, user_id, image_urls, quote)
+                    self.keep_images(session, user_id, image_urls, quote, sources)
                     return
                 pending = self.clear_images(session)
                 has_reference = any(isinstance(s, dict) and s.get("type") == "reply" for s in raw)
                 if pending and not has_reference and time.monotonic() - pending[2] < self.cfg.media_ttl_seconds:
                     image_urls = list(dict.fromkeys(pending[0] + image_urls))
                     quote = quote or pending[1]
+                    sources.update(pending[4])
                 if len(text) + len(quote) > self.cfg.max_input_chars:
                     raise ImageError(f"消息过长，请控制在 {self.cfg.max_input_chars} 字符以内。")
                 if len(image_urls) > self.cfg.max_images:
@@ -252,6 +310,8 @@ class Bot:
             request_id, started = uuid.uuid4().hex[:10], time.monotonic()
             log.info("Request %s started (images=%s search=%s)", request_id, len(image_urls),
                      explicit_search or (self.cfg.auto_search and needs_search(query)))
+            direct_sources = set(sources)
+            sources.update(self.store.source_ids(session))
             state = ProgressState()
             task = asyncio.create_task(self.generate(session, alias, text, image_urls, query,
                 explicit_search or (self.cfg.auto_search and needs_search(query)), state))
@@ -281,7 +341,7 @@ class Bot:
             saved_text = text
             if image_urls:
                 saved_text += f"\n[本轮附带 {len(image_urls)} 张图片；原图未保留，重新检查细节请引用原图片或重发。]"
-            self.store.append(session, saved_text, answer, self.cfg.history_turns)
+            self.store.append(session, saved_text, answer, self.cfg.history_turns, direct_sources)
             log.info("Request %s delivered in %.1fs", request_id, time.monotonic() - started)
 
     async def command(self, user_id: int, session: str, alias: str, text: str):
