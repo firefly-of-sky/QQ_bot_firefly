@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from qqbot.bot import Bot
+from qqbot.progress import DEFAULT_TEMPLATES
 from qqbot.llm import ModelError
 from qqbot.onebot import OneBot
 from qqbot.search import Search, needs_search, parse_results, strip_search_citations
@@ -131,7 +132,7 @@ class ChatTests(unittest.IsolatedAsyncioTestCase):
         await started.wait()
         queued = asyncio.create_task(self.bot.handle(event(2, '排队问题')))
         await asyncio.sleep(.05)
-        self.assertEqual(self.transport.send.call_args.args[1], '稍等稍等，我还在找呢，可以输入/cancel取消哦')
+        self.assertIn(self.transport.send.call_args.args[1], [s + '，可以输入/cancel取消哦' for s in DEFAULT_TEMPLATES['thinking']])
         await self.bot.handle(event(3, '/cancel'))
         await asyncio.wait_for(asyncio.gather(active, queued), 1)
         self.assertEqual(self.llm.complete.await_count, 1)

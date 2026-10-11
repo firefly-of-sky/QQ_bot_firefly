@@ -12,6 +12,7 @@ from .images import ImageError, ImageLoader, parse_message
 from .llm import ModelError, messages
 from .onebot import DeliveryError
 from .store import Store
+from .progress import ProgressState, ProgressWording, task_kind
 from .references import References
 from .search import Search, needs_search, search_context, strip_search_citations
 
@@ -51,6 +52,7 @@ class Bot:
         self.cfg, self.store, self.llm, self.transport = cfg, store, llm, transport
         self.image_loader = image_loader or ImageLoader(cfg)
         self.search = search or Search(cfg)
+        self.progress_wording = ProgressWording(cfg.progress_templates)
         self.references = References(cfg, transport)
         self.pending_images = {}
         self.active = {}
@@ -132,19 +134,25 @@ class Bot:
         await asyncio.gather(*tasks, return_exceptions=True)
         self.pending_images.clear()
 
-    async def progress(self, user_id, session):
+    async def progress(self, user_id, session, state):
         await asyncio.sleep(self.cfg.progress_delay_seconds)
         with suppress(DeliveryError):
-            await self.reply(user_id, "稍等稍等，我还在找呢，可以输入/cancel取消哦", session)
+            await self.reply(user_id, self.progress_wording.choose(session, state.stage), session)
 
-    async def generate(self, session, alias, text, urls, query, search_required):
+    async def generate(self, session, alias, text, urls, query, search_required, state):
         history = self.store.history(session, self.cfg.history_turns)
         results = []
         async with self.model_slots:
             if search_required:
+                state.stage = "search"
                 results = await self.search.query(query)
                 text += search_context(results)
+            if urls:
+                state.stage = "image"
             images = await self.image_loader.load(urls) if urls else None
+            state.stage = task_kind(query, bool(urls))
+            if results and state.stage == "thinking":
+                state.stage = "summary"
             conversation = messages(self.cfg, history, text, images)
             answer = await self.llm.complete(self.cfg.models[alias], conversation)
         return strip_search_citations(answer, results) if results else answer
@@ -244,10 +252,11 @@ class Bot:
             request_id, started = uuid.uuid4().hex[:10], time.monotonic()
             log.info("Request %s started (images=%s search=%s)", request_id, len(image_urls),
                      explicit_search or (self.cfg.auto_search and needs_search(query)))
+            state = ProgressState()
             task = asyncio.create_task(self.generate(session, alias, text, image_urls, query,
-                explicit_search or (self.cfg.auto_search and needs_search(query))))
+                explicit_search or (self.cfg.auto_search and needs_search(query)), state))
             self.active[session] = task
-            progress = asyncio.create_task(self.progress(user_id, session))
+            progress = asyncio.create_task(self.progress(user_id, session, state))
             try:
                 answer = await task
             except asyncio.CancelledError:

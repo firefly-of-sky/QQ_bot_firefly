@@ -1,7 +1,7 @@
 import math
 import os
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -39,6 +39,7 @@ class Config:
     progress_delay_seconds: float = 12
     search_api_key_env: str = "TAVILY_API_KEY"
     auto_search: bool = True
+    progress_templates: dict[str, list[str]] = field(default_factory=dict)
 
 
 def load() -> Config:
@@ -69,6 +70,13 @@ def load() -> Config:
         value = getattr(cfg, field)
         if type(value) not in (int, float) or not math.isfinite(value) or value <= 0:
             raise ValueError(f"{field} 必须为有限正数")
+    from .progress import DEFAULT_TEMPLATES
+    if not isinstance(cfg.progress_templates, dict):
+        raise ValueError("progress_templates 必须为表")
+    for stage, options in cfg.progress_templates.items():
+        if (stage not in DEFAULT_TEMPLATES or not isinstance(options, list) or not options
+                or any(not isinstance(text, str) or not text.strip() or len(text) > 200 for text in options)):
+            raise ValueError("等待提示须使用已知阶段和非空短句列表")
     if cfg.media_ttl_seconds <= cfg.image_wait_seconds:
         raise ValueError("media_ttl_seconds 必须大于 image_wait_seconds")
     if type(cfg.auto_search) is not bool or not isinstance(cfg.search_api_key_env, str):

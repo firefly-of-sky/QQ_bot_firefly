@@ -30,3 +30,8 @@ supports_images = true
 # base_url = "https://another-provider.example/v1"
 # model = "another-model-id"
 # api_key_env = "SECONDARY_API_KEY"
+
+# Optional wording overrides; the cancellation suffix is added automatically.
+# [progress_templates]
+# search = ["稍等稍等，我还在找呢", "我再查查资料，等我一下哦"]
+# reasoning = ["稍等一下，我还在想这道题呢", "等我捋一捋解题思路哦"]
