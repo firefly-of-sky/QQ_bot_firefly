@@ -13,7 +13,7 @@ from .llm import ModelError, messages
 from .onebot import DeliveryError
 from .store import Store
 from .references import References
-from .search import Search, needs_search, search_context, source_footer
+from .search import Search, needs_search, search_context, strip_search_citations
 
 log = logging.getLogger(__name__)
 HELP = "命令：\n/help 查看帮助\n/reset 清空自己的上下文\n/cancel 取消正在处理及排队的问题\n/search 问题 联网搜索\n/status 查看自己的状态\n可发送文字、图片或同条图文消息。通过好友申请后即可私聊；图片识别需要支持视觉的模型。"
@@ -132,10 +132,10 @@ class Bot:
         await asyncio.gather(*tasks, return_exceptions=True)
         self.pending_images.clear()
 
-    async def progress(self, user_id, text, session):
+    async def progress(self, user_id, session):
         await asyncio.sleep(self.cfg.progress_delay_seconds)
         with suppress(DeliveryError):
-            await self.reply(user_id, f"还在处理「{text[:20]}」，可发 /cancel 取消。", session)
+            await self.reply(user_id, "稍等稍等，我还在找呢，可以输入/cancel取消哦", session)
 
     async def generate(self, session, alias, text, urls, query, search_required):
         history = self.store.history(session, self.cfg.history_turns)
@@ -147,7 +147,7 @@ class Bot:
             images = await self.image_loader.load(urls) if urls else None
             conversation = messages(self.cfg, history, text, images)
             answer = await self.llm.complete(self.cfg.models[alias], conversation)
-        return answer + (source_footer(results) if results else "")
+        return strip_search_citations(answer, results) if results else answer
 
     async def handle(self, event: dict):
         if not self.accepts(event):
@@ -247,7 +247,7 @@ class Bot:
             task = asyncio.create_task(self.generate(session, alias, text, image_urls, query,
                 explicit_search or (self.cfg.auto_search and needs_search(query))))
             self.active[session] = task
-            progress = asyncio.create_task(self.progress(user_id, query, session))
+            progress = asyncio.create_task(self.progress(user_id, session))
             try:
                 answer = await task
             except asyncio.CancelledError:

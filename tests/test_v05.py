@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from qqbot.bot import Bot
 from qqbot.llm import ModelError
 from qqbot.onebot import OneBot
-from qqbot.search import Search, needs_search, parse_results
+from qqbot.search import Search, needs_search, parse_results, strip_search_citations
 from qqbot.store import Store
 from test_bot import config, event
 from test_images import picture, IMAGE_URL
@@ -108,10 +108,13 @@ class ChatTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_search_sources_and_failure_not_saved(self):
         self.search.query.return_value = [{'title': '来源', 'url': 'https://example.com/a', 'content': '证据'}]
+        self.llm.complete.return_value = '今天有雨[1]，记得带伞【1】。'
         await self.bot.handle(event(1, '/search 上海天气'))
         self.search.query.assert_awaited_once_with('上海天气')
         self.assertIn('本次联网', self.llm.complete.call_args.args[1][-1]['content'])
-        self.assertIn('https://example.com/a', self.transport.send.call_args.args[1])
+        self.assertEqual(self.transport.send.call_args.args[1], '今天有雨，记得带伞。')
+        self.assertIn('https://example.com/a', self.llm.complete.call_args.args[1][-1]['content'])
+        self.assertEqual(self.store.history('private:456:123', 20)[0][1], '今天有雨，记得带伞。')
         self.search.query.side_effect = ModelError('搜索失败')
         await self.bot.handle(event(2, '今天的天气'))
         self.assertEqual(len(self.store.history('private:456:123', 20)), 1)
@@ -128,7 +131,7 @@ class ChatTests(unittest.IsolatedAsyncioTestCase):
         await started.wait()
         queued = asyncio.create_task(self.bot.handle(event(2, '排队问题')))
         await asyncio.sleep(.05)
-        self.assertIn('还在处理', self.transport.send.call_args.args[1])
+        self.assertEqual(self.transport.send.call_args.args[1], '稍等稍等，我还在找呢，可以输入/cancel取消哦')
         await self.bot.handle(event(3, '/cancel'))
         await asyncio.wait_for(asyncio.gather(active, queued), 1)
         self.assertEqual(self.llm.complete.await_count, 1)
@@ -179,6 +182,12 @@ class ChatTests(unittest.IsolatedAsyncioTestCase):
 
 
 class SearchTests(unittest.IsolatedAsyncioTestCase):
+    def test_search_citations_preserve_code_and_non_source_numbers(self):
+        results = [{'url': 'https://example.com/a'}, {'url': 'https://example.com/b'}]
+        text = '结论[1, 2]。依据[1](https://example.com/a)。`a[1]`\n```python\na = [1]\n```\na[1] 与 [99]'
+        expected = '结论。依据。`a[1]`\n```python\na = [1]\n```\na[1] 与 [99]'
+        self.assertEqual(strip_search_citations(text, results), expected)
+
     async def test_no_key_and_bad_results(self):
         with patch.dict(os.environ, {'TAVILY_API_KEY': ''}):
             with self.assertRaisesRegex(ModelError, '未配置'):
