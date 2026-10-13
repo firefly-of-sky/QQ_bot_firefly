@@ -1,8 +1,10 @@
-# QQbot：私人 QQ 模型助手
+# QQbot 2.0：可调用工具的 QQ 会话助手
 
-使用单独的 QQ 号接收好友私聊，通过可配置的 Chat Completions 兼容 API 回答。当前 v0.5.3 支持所有好友私聊、独立会话、连续对话、图片识别、Markdown 转纯文本、多个模型、模型切换、清空会话、重启恢复。新增图片等待需求、引用消息、Tavily 联网搜索和取消请求。群聊、文件、语音暂未启用。
+使用单独的 QQ 号接收好友私聊，通过可配置的 Chat Completions 兼容 API 回答。v2.0.0 加入自主工具调用：模型可以搜索、读取网页、计算、查询时间，根据中间结果再次调用工具，最后回答。支持独立会话、连续对话、图片识别、引用、撤回取消、Markdown 转纯文本、模型切换和重启恢复。群聊、文件附件、语音、长期记忆和外部 MCP 尚未启用。
 
-消息路径：你的 QQ → 机器人 QQ / NapCat → Python 聊天服务 → 模型 API → QQ 回复。
+消息路径：你的 QQ → NapCat → 会话管理 → Agent（模型 ⇄ 工具）→ 最终回答 → QQ。
+
+2.0 默认启用 Agent，模型需要原生 `tools` / `tool_calls` 支持。配置 `supports_tools = false` 可明确选择旧版兼容聊天，不会因为接口失败而静默降级。完整说明见 [2.0 更新与迁移](docs/v2.0.0.md) 和 [架构与扩展](docs/architecture.md)。
 
 QQ 聊天记录整理工具已移到同级独立项目 [QQChatArchive](../QQChatArchive/README.md)，由该项目单独维护源码、运行组件和 Git 历史。
 
@@ -43,7 +45,7 @@ api_key_env = "PRIMARY_API_KEY"
 
 `base_url` 应是接口前缀：程序会在后面加 `/chat/completions`。有的服务商前缀不是 `/v1`，按其文档填写，不要机械增加 `/v1`。`api_key_env` 是环境变量名，不是密钥本身。
 
-程序发送 `model`、`messages`、`max_tokens`、`stream=false`。文字消息使用字符串 content，图片消息使用 text 与 image_url 内容数组，图片通过 Base64 Data URL 传入。要求接口返回 `choices[0].message.content` 文本。仅支持原生 Responses、Anthropic Messages 或 Gemini 协议的端点不能直接填入；只接受 `max_completion_tokens` 等特殊参数的模型也需要后续适配。
+程序发送 `model`、`messages`、`max_tokens`、`stream=false`。Agent 模式还发送 `tools` 和 `tool_choice`，接收 `tool_calls`，执行工具后以 `role=tool` 回传结果。支持同一回复多工具调用，最终读取 `choices[0].message.content` 文本。文字消息使用字符串 content，图片消息使用 text 与 image_url 内容数组，图片通过 Base64 Data URL 传入。仅支持原生 Responses、Anthropic Messages 或 Gemini 协议的端点不能直接填入；只接受 `max_completion_tokens` 等特殊参数的模型也需要后续适配。
 
 ## 2. 先验证模型
 
@@ -53,9 +55,10 @@ api_key_env = "PRIMARY_API_KEY"
 docker compose build bot
 docker compose run --rm --no-deps bot python -m qqbot --check-config
 docker compose run --rm --no-deps bot python -m qqbot --check-model primary
+docker compose run --rm --no-deps bot python -m qqbot --check-agent primary
 ```
 
-分别看到“配置有效”和“模型调用成功”后继续。配置检查不验证密钥真实有效，也不检查 QQ 是否在线；模型检查只输出成功状态，不显示密钥或回答正文。
+分别看到“配置有效”“模型调用成功”和“Agent 验证成功”后继续。Agent 检查用计算工具完成一次闭环，最多 3 次模型请求，不连接 QQ；检查成功会显示调用次数。配置检查不验证密钥真实有效，也不检查 QQ 是否在线。模型检查不显示密钥或回答正文。选择兼容模式时跳过 Agent 检查。
 
 ## 3. 启动 NapCat 并扫码登录
 
@@ -127,9 +130,9 @@ docker compose logs -f bot
 3. 执行 `docker compose up -d --force-recreate --no-deps bot` 让常驻容器读取新密钥。
 4. 在 QQ 发 `/search 上海今天的天气`，检查回答是否直接呈现结果，不再附带来源列表或引用编号。
 
-显式 `/search 问题` 始终搜索；默认对“最新价格”“天气怎么样”“运营商套餐资费怎么样”等关键词问题自动搜索。自动判断是规则匹配，不保证覆盖所有实时问题；可用 `/search` 强制搜索，或在配置顶部设置 `auto_search = false` 仅手动触发。未填 Key、搜索失败或没有结果时明确告知，不继续生成貌似核实过的实时答案。
+Agent 模式由模型判断何时搜索、搜索什么，以及是否需要展开网页或继续核实；模型判断不保证覆盖所有实时问题。显式 `/search 问题` 强制本轮取得搜索资料，没有成功搜索就不会发送模型生成的最终答案。`auto_search = false` 时普通对话不开放联网工具，`/search` 仍可使用。未配置搜索 Key 时仅开放计算和时间工具，并告知模型无法联网。`supports_tools = false` 的兼容模式仍使用旧版关键词搜索流程。
 
-只把本次问题及其检索改写发送到 Tavily，不发送历史对话、图片和引用原文；普通搜索返回最多 5 个片段；薪资问题最多执行 3 次深度检索，去重后最多保留 9 条资料，模型据此回答；来源信息保留在内部参考资料中，QQ 回复不再附加来源列表，并清理常见引用编号。检索片段仍可能过时或不完整。服务商原生 `enable_search` 没有返回可核验来源，本版不依赖这一能力。协议参考 [Tavily Search API](https://docs.tavily.com/documentation/api-reference/endpoint/search)。
+Agent 仅将模型选择的查询词或网页 URL 发送到 Tavily，不自动附带完整历史或图片；查询词仍可能包含完成当前任务所需的对话信息。单次搜索返回最多 5 条普通或 6 条深度结果，每轮对话默认最多 8 次工具调用。网页正文使用 Tavily Extract，读取失败会明确返回给模型。工具结果默认最多 8000 UTF-8 字节，超过时标记截断。来源保留在本轮内部资料中，QQ 回复不额外附来源列表，并清理常见引用编号；最终措辞仍受模型影响。服务商原生 `enable_search` 不参与本流程。协议参考 [Tavily Search API](https://docs.tavily.com/documentation/api-reference/endpoint/search) 和 [Extract API](https://docs.tavily.com/documentation/api-reference/endpoint/extract)。
 
 可选配置放在 `config.toml` 顶部、任何 `[models.*]` 表之前，已有配置不填即采用默认值：
 

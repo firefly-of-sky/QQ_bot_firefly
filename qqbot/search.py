@@ -64,6 +64,42 @@ class Search:
     def __init__(self, cfg):
         self.cfg = cfg
 
+    def available(self):
+        key = os.environ.get(self.cfg.search_api_key_env, '')
+        return bool(key and not key.startswith('replace-'))
+
+    def key(self):
+        if not self.available():
+            raise SearchUnavailable('联网工具尚未配置，请填写搜索服务密钥。')
+        return os.environ[self.cfg.search_api_key_env]
+
+    async def query_once(self, text: str, depth: str = 'basic') -> list[dict]:
+        """Agent chooses the query; do not inject the legacy salary query plan."""
+        key = self.key()
+        async with aiohttp.ClientSession(trust_env=True) as http:
+            return await self.fetch(http, key, text, depth == 'advanced', salary=False)
+
+    async def read_page(self, url: str) -> dict:
+        key = self.key()
+        try:
+            async with aiohttp.ClientSession(trust_env=True) as http:
+                async with http.post('https://api.tavily.com/extract',
+                        headers={'Authorization': 'Bearer ' + key},
+                        json={'urls': [url], 'extract_depth': 'basic', 'format': 'text'},
+                        timeout=aiohttp.ClientTimeout(total=self.cfg.tool_timeout_seconds),
+                        allow_redirects=False) as response:
+                    if response.status in (401, 403, 429):
+                        raise SearchUnavailable(f'网页读取暂不可用（HTTP {response.status}），请检查搜索密钥或额度。')
+                    if response.status != 200:
+                        raise ModelError(f'网页读取失败（HTTP {response.status}）。')
+                    data = await response.json()
+            for item in data.get('results', []):
+                if isinstance(item, dict) and isinstance(item.get('raw_content'), str) and item['raw_content'].strip():
+                    return {'url': url, 'content': item['raw_content'][:32000]}
+            raise ModelError('未能读取该网页正文，页面可能需要登录或不支持提取。')
+        except (aiohttp.ClientError, OSError, TimeoutError, ValueError, TypeError, AttributeError) as exc:
+            raise ModelError('网页读取失败，未获得可靠正文。') from exc
+
     async def query(self, text: str) -> list[dict]:
         key = os.environ.get(self.cfg.search_api_key_env, '')
         if not key or key.startswith('replace-'):
@@ -96,7 +132,7 @@ class Search:
             results[0]['partial'] = True
         return results
 
-    async def fetch(self, http, key, text, advanced):
+    async def fetch(self, http, key, text, advanced, *, salary=None):
         payload = {'query': text, 'max_results': 6 if advanced else 5,
                    'search_depth': 'advanced' if advanced else 'basic',
                    'include_answer': False, 'include_raw_content': False}
@@ -111,7 +147,7 @@ class Search:
                 if response.status != 200:
                     raise ModelError(f'联网搜索暂不可用（HTTP {response.status}），这次没有完成核实，请稍后重试。')
                 data = await response.json()
-            return parse_results(data, limit=6 if advanced else 5, salary=advanced)
+            return parse_results(data, limit=6 if advanced else 5, salary=advanced if salary is None else salary)
         except (aiohttp.ClientError, OSError, TimeoutError, ValueError, TypeError) as exc:
             raise ModelError('联网搜索失败，这次没有完成核实，请稍后重试。') from exc
 

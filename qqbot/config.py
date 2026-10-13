@@ -12,6 +12,7 @@ class Model:
     model: str
     api_key_env: str
     supports_images: bool = True
+    supports_tools: bool = True
 
 
 @dataclass(frozen=True)
@@ -43,6 +44,12 @@ class Config:
     search_max_results: int = 9
     search_timeout_seconds: float = 45
     progress_templates: dict[str, list[str]] = field(default_factory=dict)
+    persona_file: str = ""
+    agent_max_rounds: int = 6
+    agent_max_tool_calls: int = 8
+    agent_timeout_seconds: float = 240
+    tool_timeout_seconds: float = 30
+    tool_result_bytes: int = 8000
 
 
 def load() -> Config:
@@ -60,7 +67,7 @@ def load() -> Config:
         raise ValueError("OWNER_QQ 或 ONEBOT_TOKEN 尚未正确配置")
     if cfg.default_model not in models:
         raise ValueError("default_model 不在 models 中")
-    for field in ("history_turns", "max_input_chars", "context_budget_bytes", "max_output_tokens", "reply_chunk_chars", "max_images", "max_image_bytes", "max_concurrent_requests", "requests_per_minute", "search_max_queries", "search_max_results"):
+    for field in ("history_turns", "max_input_chars", "context_budget_bytes", "max_output_tokens", "reply_chunk_chars", "max_images", "max_image_bytes", "max_concurrent_requests", "requests_per_minute", "search_max_queries", "search_max_results", "agent_max_rounds", "agent_max_tool_calls", "tool_result_bytes"):
         value = getattr(cfg, field)
         if type(value) is not int or value <= 0:
             raise ValueError(f"{field} 必须是正整数")
@@ -69,10 +76,18 @@ def load() -> Config:
         raise ValueError("request_timeout_seconds 必须为有限正数")
     if not isinstance(cfg.system_prompt, str):
         raise ValueError("system_prompt 必须为文字")
-    for field in ("image_wait_seconds", "media_ttl_seconds", "progress_delay_seconds", "search_timeout_seconds"):
+    for field in ("image_wait_seconds", "media_ttl_seconds", "progress_delay_seconds", "search_timeout_seconds", "agent_timeout_seconds", "tool_timeout_seconds"):
         value = getattr(cfg, field)
         if type(value) not in (int, float) or not math.isfinite(value) or value <= 0:
             raise ValueError(f"{field} 必须为有限正数")
+    if cfg.agent_max_rounds > 20 or cfg.agent_max_tool_calls > 32:
+        raise ValueError("Agent 最多 20 轮、32 次工具调用")
+    if not 1024 <= cfg.tool_result_bytes <= 32000:
+        raise ValueError("tool_result_bytes 必须在 1024–32000 之间")
+    if not isinstance(cfg.persona_file, str):
+        raise ValueError("persona_file 必须为文件路径文字")
+    from .prompts import load_persona
+    load_persona(cfg.persona_file)
     from .progress import DEFAULT_TEMPLATES
     if not isinstance(cfg.progress_templates, dict):
         raise ValueError("progress_templates 必须为表")
@@ -95,6 +110,8 @@ def load() -> Config:
     for alias, model in models.items():
         if type(model.supports_images) is not bool:
             raise ValueError("supports_images 必须为布尔值")
+        if type(model.supports_tools) is not bool:
+            raise ValueError("supports_tools 必须为布尔值")
         if not all(isinstance(value, str) and value for value in (model.base_url, model.model, model.api_key_env)):
             raise ValueError("模型配置必须为非空文字")
         parsed = urlsplit(model.base_url)

@@ -18,9 +18,10 @@ from scripts.init_config import initialize
 
 
 def config(path=":memory:"):
+    # Preserve the legacy regression suite; test_agent.py exercises the 2.0 engine.
     return Config(owner=123, token="test-token", ws_url="ws://localhost:3001", database=path,
-                  models={"first": Model("https://example.test/v1", "m1", "TEST_KEY"),
-                          "second": Model("https://example.test/v1", "m2", "TEST_KEY")},
+                  models={"first": Model("https://example.test/v1", "m1", "TEST_KEY", supports_tools=False),
+                          "second": Model("https://example.test/v1", "m2", "TEST_KEY", supports_tools=False)},
                   default_model="first")
 
 

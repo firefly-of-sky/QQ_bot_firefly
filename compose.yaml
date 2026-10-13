@@ -19,6 +19,7 @@ services:
       ONEBOT_URL: ws://napcat:3001
     volumes:
       - ./config.toml:/app/config.toml:ro
+      - ./personas:/app/personas:ro
       - bot-data:/data
     depends_on:
       - napcat
