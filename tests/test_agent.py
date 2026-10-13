@@ -87,7 +87,8 @@ class AgentTests(unittest.IsolatedAsyncioTestCase):
         self.llm.turn.return_value = ModelReply("没查但答案是这样")
         with self.assertRaisesRegex(ModelError, "未获得有效搜索"):
             await self.run_agent(force_search=True)
-        self.assertEqual(self.llm.turn.call_args.args[3]["function"]["name"], "web_search")
+        self.assertEqual(self.llm.turn.call_args.args[3], "auto")
+        self.assertIn("本轮必须先调用 web_search", self.llm.turn.call_args.args[1][0]["content"])
         self.registry.tools.pop("web_search")
         with self.assertRaisesRegex(ModelError, "未启用"):
             await self.run_agent(force_search=True)
@@ -332,6 +333,40 @@ class AgentBotTests(unittest.IsolatedAsyncioTestCase):
 
 
 class ToolHTTPTests(unittest.IsolatedAsyncioTestCase):
+    async def test_explicit_search_works_with_endpoint_rejecting_named_tool_choice(self):
+        requests = []
+        async def handler(request):
+            body = await request.json()
+            requests.append(body)
+            if isinstance(body.get("tool_choice"), dict):
+                return web.json_response({"error": "named tool choice unsupported"}, status=400)
+            if len(requests) == 1:
+                reply = call(1, "web_search", query="Python asyncio")
+                return web.json_response({"choices": [{"message": reply.as_message()}]})
+            self.assertTrue(json.loads(body["messages"][-1]["content"])["ok"])
+            return web.json_response({"choices": [{"message": {"content": "已查到官方资料"}}]})
+        app = web.Application()
+        app.router.add_post("/chat/completions", handler)
+        runner = web.AppRunner(app)
+        await runner.setup()
+        try:
+            site = web.TCPSite(runner, "127.0.0.1", 0)
+            await site.start()
+            port = site._server.sockets[0].getsockname()[1]
+            cfg = agent_config()
+            search = SimpleNamespace(query_once=AsyncMock(return_value=[
+                {"url": "https://docs.python.org/3/library/asyncio.html", "title": "asyncio", "content": "官方文档"}]))
+            registry = build_tools(cfg, search, ProgressState(), web_enabled=True)
+            with patch.dict(os.environ, {"TEST_KEY": "secret"}):
+                async with aiohttp.ClientSession() as http:
+                    model = Model(f"http://127.0.0.1:{port}", "test", "TEST_KEY")
+                    result = await Agent(cfg, LLM(http, cfg), registry).run(model, [], "Python asyncio", force_search=True)
+            self.assertEqual(result.text, "已查到官方资料")
+            search.query_once.assert_awaited_once_with("Python asyncio", "basic")
+            self.assertEqual(requests[0]["tool_choice"], "auto")
+        finally:
+            await runner.cleanup()
+
     async def test_actual_http_tool_request_result_and_final_answer(self):
         requests = []
         async def handler(request):

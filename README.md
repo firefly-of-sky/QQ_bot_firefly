@@ -4,6 +4,8 @@
 
 消息路径：你的 QQ → NapCat → 会话管理 → Agent（模型 ⇄ 工具）→ 最终回答 → QQ。
 
+当前版本为 **v2.0.1**，修复显式 `/search` 的接口兼容性，并提供[真实接口验收脚本](docs/v2.0.1.md)。
+
 2.0 默认启用 Agent，模型需要原生 `tools` / `tool_calls` 支持。配置 `supports_tools = false` 可明确选择旧版兼容聊天，不会因为接口失败而静默降级。完整说明见 [2.0 更新与迁移](docs/v2.0.0.md) 和 [架构与扩展](docs/architecture.md)。
 
 QQ 聊天记录整理工具已移到同级独立项目 [QQChatArchive](../QQChatArchive/README.md)，由该项目单独维护源码、运行组件和 Git 历史。

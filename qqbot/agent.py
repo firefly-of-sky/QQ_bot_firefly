@@ -91,6 +91,8 @@ class Agent:
         now = datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d")
         availability = ("联网工具已开放。" if "web_search" in self.registry.tools else
                         "本轮联网工具不可用，不能声称已检索或核实实时信息。")
+        if force_search:
+            availability += "\n用户使用了 /search。本轮必须先调用 web_search 取得有效资料，再回答；不能仅依赖历史或已有知识。"
         cfg = replace(self.cfg, system_prompt=self.cfg.system_prompt + "\n" + persona +
                       AGENT_RULES + f"\n当前北京时间日期：{now}。{availability}")
         context = Context(messages(cfg, history, text, images), cfg.context_budget_bytes)
@@ -109,8 +111,8 @@ class Agent:
                     raise ModelError("本轮资料超过上下文预算，请缩小问题后重试。")
             self.registry.state.stage = "summary" if self.registry.sources else initial_stage
             choice = "none" if final_only else "auto"
-            if force_search and round_index == 0:
-                choice = {"type": "function", "function": {"name": "web_search"}}
+            # Thinking-model endpoints may reject a named tool_choice. The
+            # instructions and successful-search check still enforce /search.
             reply = await self.llm.turn(model, conversation, schemas, choice)
             if not reply.calls:
                 if force_search and "web_search" not in self.registry.successful:
