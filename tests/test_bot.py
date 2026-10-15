@@ -22,7 +22,7 @@ def config(path=":memory:"):
     return Config(owner=123, token="test-token", ws_url="ws://localhost:3001", database=path,
                   models={"first": Model("https://example.test/v1", "m1", "TEST_KEY", supports_tools=False),
                           "second": Model("https://example.test/v1", "m2", "TEST_KEY", supports_tools=False)},
-                  default_model="first")
+                  default_model="first", message_merge_seconds=0)
 
 
 def event(number=1, text="你好", **extra):

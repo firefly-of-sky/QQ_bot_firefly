@@ -50,6 +50,8 @@ class Config:
     agent_timeout_seconds: float = 240
     tool_timeout_seconds: float = 30
     tool_result_bytes: int = 8000
+    message_merge_seconds: float = 1.2
+    message_merge_max_seconds: float = 4.0
 
 
 def load() -> Config:
@@ -82,6 +84,13 @@ def load() -> Config:
             raise ValueError(f"{field} 必须为有限正数")
     if cfg.agent_max_rounds > 20 or cfg.agent_max_tool_calls > 32:
         raise ValueError("Agent 最多 20 轮、32 次工具调用")
+    if (type(cfg.message_merge_seconds) not in (int, float)
+            or not math.isfinite(cfg.message_merge_seconds) or not 0 <= cfg.message_merge_seconds <= 5):
+        raise ValueError("message_merge_seconds 必须为 0–5 秒，0 关闭合并")
+    if (type(cfg.message_merge_max_seconds) not in (int, float)
+            or not math.isfinite(cfg.message_merge_max_seconds)
+            or not max(0.01, cfg.message_merge_seconds) <= cfg.message_merge_max_seconds <= 10):
+        raise ValueError("message_merge_max_seconds 必须不小于合并等待且最多 10 秒")
     if not 1024 <= cfg.tool_result_bytes <= 32000:
         raise ValueError("tool_result_bytes 必须在 1024–32000 之间")
     if not isinstance(cfg.persona_file, str):

@@ -6,7 +6,8 @@
 flowchart LR
     QQ[QQ / NapCat] <--> Transport[onebot.py 接入与回执]
     Transport --> Session[bot.py 会话与生命周期]
-    Session --> Runtime[runtime.py 执行入口]
+    Session --> Turns[turns.py 连续消息与控制表达]
+    Turns --> Runtime[runtime.py 执行入口]
     Runtime --> Agent[agent.py 决策循环]
     Agent <--> Model[llm.py 模型协议]
     Agent <--> Tools[tools.py 工具注册与执行]
@@ -23,6 +24,7 @@ flowchart LR
 | --- | --- |
 | `onebot.py` | QQ 连接、重连、事件队列、动作回执；收消息不等待模型 |
 | `bot.py` | 好友校验、会话隔离、去重、命令、图片暂存、引用、取消和发送 |
+| `turns.py` | 有界消息批次、来源关联、合并条件、明确停止与更正表达；任务生命周期仍由 bot 管理 |
 | `runtime.py` | 组装图片与上下文，按模型配置选择 Agent 或兼容流程 |
 | `agent.py` | 模型 → 工具 → 结果 → 模型循环、上下文预算、调用预算、总时限 |
 | `llm.py` | Chat Completions HTTP、原生工具调用解析、协议错误检查 |
@@ -36,6 +38,7 @@ Agent 不持有 QQ 发送对象或聊天数据库。工具不能任意指定接�
 ## 执行与取消
 
 - 同用户串行，不同用户并发；全局并发上限覆盖图片处理和整轮 Agent 执行。
+- 2.1 默认停顿 1.2 秒合并同一好友连续消息，每批最多等待 4 秒、12 条并限制文字量。合并等待不占模型并发名额。自然停止会取消该会话未完成工作；更正以最近未完成问题为基础重启，并携带原素材与全部来源 ID。
 - 默认最多 6 轮允许工具调用的模型请求，另允许 1 次收尾请求；工具调用总计最多 8 次。达到工具数上限会提前进入收尾。
 - 收尾请求使用 `tool_choice=none`；模型仍要求执行工具时终止，不越过限制。
 - 同轮同工具同参数复用结果，仍占调用预算。鉴权/额度错误后本轮停止继续请求联网服务。

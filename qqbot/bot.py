@@ -7,6 +7,7 @@ from collections import deque
 from weakref import WeakValueDictionary
 
 from .config import Config
+from . import __version__
 from .formatting import to_plain_text
 from .images import ImageError, ImageLoader, parse_message
 from .llm import ModelError
@@ -16,9 +17,10 @@ from .progress import ProgressState, ProgressWording
 from .references import References
 from .search import Search, needs_search
 from .runtime import ConversationRuntime
+from .turns import Turn, control, mergeable, plain_text, source_ids, text_size
 
 log = logging.getLogger(__name__)
-HELP = "命令：\n/help 查看帮助\n/reset 清空自己的上下文\n/cancel 取消正在处理及排队的问题\n/search 问题 联网搜索\n/status 查看自己的状态\n可发送文字、图片或同条图文消息。Agent 模式可按需搜索、读取网页、计算和查询时间，联网需主人配置。通过好友申请后即可私聊；图片识别需要支持视觉的模型。"
+HELP = "命令：\n/help 查看帮助\n/reset 清空自己的上下文\n/cancel 取消正在处理及排队的问题\n/search 问题 联网搜索\n/status 查看自己的状态\n连续发送的文字和图片会短暂等待后合并理解。可说“不用查了”停止，或“我刚才说错了，是……”修正尚未完成的问题。\n可发送文字、图片或同条图文消息。Agent 模式可按需搜索、读取网页、计算和查询时间，联网需主人配置。通过好友申请后即可私聊；图片识别需要支持视觉的模型。"
 OWNER_HELP = "\n主人命令：\n/models 查看模型\n/model 别名 切换自己的模型并清空上下文"
 
 
@@ -58,6 +60,8 @@ class Bot:
         self.pending_images = {}
         self.active = {}
         self.jobs = {}
+        self.pending_turns = {}
+        self.unfinished = {}
         self.epochs = {}
         self.background = set()
         self.locks = WeakValueDictionary()
@@ -139,6 +143,8 @@ class Bot:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
         self.pending_images.clear()
+        self.pending_turns.clear()
+        self.unfinished.clear()
 
     async def progress(self, user_id, session, state):
         await asyncio.sleep(self.cfg.progress_delay_seconds)
@@ -164,8 +170,28 @@ class Bot:
             self.clear_images(session)
         for (job_session, _), (sources, task) in list(self.jobs.items()):
             if job_session == session and message_id in sources:
+                burst = self.pending_turns.get(session)
+                if burst and burst.task is task and burst.resume is None:
+                    burst.parts[:] = [p for p in burst.parts if message_id not in source_ids(p)]
+                    sources.clear()
+                    for part in burst.parts:
+                        sources.update(source_ids(part))
+                    if burst.parts:
+                        continue
                 task.cancel()
         log.info("Private message recalled; matching work and local context removed")
+
+    def interrupt(self, session):
+        self.epochs[session] = time.monotonic()
+        for (job_session, _), (_, task) in list(self.jobs.items()):
+            if job_session == session:
+                task.cancel()
+        active = self.active.get(session)
+        if active:
+            active.cancel()
+        self.pending_turns.pop(session, None)
+        self.clear_images(session)
+        self.references.clear(session)
 
     async def handle(self, event: dict):
         if not self.accepts(event):
@@ -174,31 +200,114 @@ class Bot:
             await self.recall(event)
             return
         session = f"private:{qq_id(event['self_id'])}:{qq_id(event['user_id'])}"
-        sources = {str(event['message_id'])}
-        raw = event.get('message')
-        if isinstance(raw, list):
-            for segment in raw:
-                if (isinstance(segment, dict) and segment.get('type') == 'reply'
-                        and isinstance(segment.get('data'), dict)):
-                    reference = segment['data'].get('id')
-                    if type(reference) in (str, int):
-                        sources.add(str(reference))
+        event = dict(event)
+        event.setdefault('_received_at', time.monotonic())
+        if event['_received_at'] <= self.epochs.get(session, 0):
+            return
+        sources = source_ids(event)
         if any(self.store.is_recalled(session, source) for source in sources):
             return
         key = (session, str(event['message_id']))
-        if key in self.jobs:
+        simple = plain_text(event.get('message'))
+        if simple is not None and simple.rstrip("～~。！!") in {
+                "请求添加你为好友", "我们已成功添加为好友，现在可以开始聊天啦",
+                "我们已经是好友啦，一起来聊天吧", "我通过了你的朋友验证请求，现在我们可以开始聊天了"}:
             return
-        task = asyncio.create_task(self._handle(event, sources))
-        self.jobs[key] = (sources, task)
+        if not self.store.claim(f"{session}:{event['message_id']}"):
+            return
+        kind, tail = control(simple)
+        parts, resume = [event], None
+        command_parts = simple.split() if simple else []
+        switching = (event['user_id'] == self.cfg.owner and len(command_parts) == 2
+                     and command_parts[0] == '/model' and command_parts[1] in self.cfg.models)
+        if simple in ('/cancel', '/reset') or switching or kind == 'stop':
+            self.interrupt(session)
+            event['_received_at'] = time.monotonic()
+            if simple == '/cancel' or (kind == 'stop' and not tail):
+                text = '已取消当前及排队的问题。' if simple == '/cancel' else '好，已经停下，刚才的问题不再继续处理。'
+                await self.reply(event['user_id'], text, session, self.epochs[session])
+                return
+            if kind == 'stop':
+                event['message'] = [{'type': 'text', 'data': {'text': tail}}]
+        elif kind == 'correct':
+            candidates = [t for t in self.unfinished.get(session, []) if not t.task.done()]
+            if candidates:
+                previous = candidates[-1]
+                resume = previous.prepared or previous.resume
+                parts = ([event] if previous.prepared else [*previous.parts, event])
+                sources.update(previous.prepared['sources'] if previous.prepared else previous.sources)
+                self.interrupt(session)
+                event['_received_at'] = time.monotonic()
+                if len(parts) > 12 or text_size(parts) > self.cfg.max_input_chars:
+                    await self.reply(event['user_id'], '更正内容过长，请重新发送完整问题。', session,
+                                     self.epochs[session])
+                    return
+        burst = self.pending_turns.get(session)
+        batchable = mergeable(event) and self.cfg.message_merge_seconds > 0
+        if burst and (not batchable or simple and simple.startswith('/search ')
+                      or time.monotonic() >= min(burst.opened + self.cfg.message_merge_max_seconds,
+                                                burst.updated + self.cfg.message_merge_seconds)
+                      or len(burst.parts) >= 12
+                      or text_size([*burst.parts, *parts]) > self.cfg.max_input_chars
+                      or sum(s.get('type') == 'reply' for p in [*burst.parts, *parts]
+                             for s in p.get('message', []) if isinstance(s, dict)) > 1):
+            burst.sealed = True
+            burst.wake.set()
+            self.pending_turns.pop(session, None)
+            burst = None
+        if burst:
+            burst.parts.extend(parts)
+            burst.sources.update(sources)
+            burst.updated = time.monotonic()
+            burst.wake.set()
+        else:
+            burst = Turn(parts, sources, sealed=not batchable, resume=resume, wake=asyncio.Event())
+            burst.task = asyncio.create_task(self.run_turn(session, key, burst))
+            self.jobs[key] = (burst.sources, burst.task)
+            self.unfinished.setdefault(session, []).append(burst)
+            burst.task.add_done_callback(lambda task: self.finish_turn(session, key, burst, task))
+            if batchable:
+                self.pending_turns[session] = burst
         try:
-            await task
+            await asyncio.shield(burst.task)
         except asyncio.CancelledError:
             if asyncio.current_task().cancelling():
                 raise
-        finally:
-            self.jobs.pop(key, None)
 
-    async def _handle(self, event: dict, sources):
+    async def run_turn(self, session, key, burst):
+        try:
+            while not burst.sealed:
+                remaining = min(burst.opened + self.cfg.message_merge_max_seconds,
+                                burst.updated + self.cfg.message_merge_seconds) - time.monotonic()
+                if remaining <= 0:
+                    break
+                burst.wake.clear()
+                try:
+                    await asyncio.wait_for(burst.wake.wait(), remaining)
+                except TimeoutError:
+                    break
+            burst.sealed = True
+            if self.pending_turns.get(session) is burst:
+                self.pending_turns.pop(session, None)
+            if burst.parts:
+                await self._handle(burst.event(), burst.sources, burst)
+        finally:
+            self.finish_turn(session, key, burst)
+
+    def finish_turn(self, session, key, burst, task=None):
+        # A task cancelled before its first step never enters run_turn's finally.
+        if task is not None and not task.cancelled():
+            task.exception()
+        self.jobs.pop(key, None)
+        if self.pending_turns.get(session) is burst:
+            self.pending_turns.pop(session, None)
+        turns = self.unfinished.get(session, [])
+        if burst in turns:
+            turns.remove(burst)
+        if not turns:
+            self.unfinished.pop(session, None)
+
+    async def _handle(self, event: dict, sources, burst):
         if not self.accepts(event):
             return
         user_id = qq_id(event["user_id"])
@@ -207,28 +316,6 @@ class Bot:
         if received_at <= self.epochs.get(session, 0):
             return
         raw = event.get("message")
-        # QQ can expose friend verification / system greetings as private text.
-        simple = "".join(s.get("data", {}).get("text", "") for s in raw
-                         if isinstance(s, dict) and s.get("type") == "text"
-                         and isinstance(s.get("data"), dict)
-                         and isinstance(s["data"].get("text"), str)) if isinstance(raw, list) else ""
-        text_only = isinstance(raw, list) and all(isinstance(s, dict) and s.get("type") == "text" for s in raw)
-        if text_only and simple.strip().rstrip("～~。！!") in {
-                "请求添加你为好友", "我们已成功添加为好友，现在可以开始聊天啦",
-                "我们已经是好友啦，一起来聊天吧", "我通过了你的朋友验证请求，现在我们可以开始聊天了"}:
-            return
-        if not self.store.claim(f"{session}:{event['message_id']}"):
-            return
-        if text_only and simple.strip() in ("/cancel", "/reset"):
-            self.epochs[session] = time.monotonic()
-            active = self.active.get(session)
-            if active:
-                active.cancel()
-            self.clear_images(session)
-            self.references.clear(session)
-            if simple.strip() == "/cancel":
-                await self.reply(user_id, "已取消当前及排队的问题。", session)
-                return
         epoch = self.epochs.get(session, 0)
         lock = self.locks.setdefault(session, asyncio.Lock())
         async with lock:
@@ -244,7 +331,8 @@ class Bot:
                 return
             if epoch != self.epochs.get(session, 0):
                 return
-            self.references.remember(session, event['message_id'], raw)
+            for part in burst.parts:
+                self.references.remember(session, part['message_id'], part['message'])
             if not text and not image_urls and not quote:
                 return
             alias = self.store.model(session, self.cfg.default_model)
@@ -257,6 +345,12 @@ class Bot:
                 return
             if explicit_search:
                 text = text[len("/search "):].strip()
+            if burst.resume:
+                prior = burst.resume
+                text = ("尚未完成的原请求（以本次更正为准）：\n" + prior['text']
+                        + "\n\n用户本次更正：\n" + text)
+                image_urls = list(dict.fromkeys(prior['urls'] + image_urls))
+                explicit_search = explicit_search or prior['explicit_search']
             if not text and quote and not image_urls:
                 await self.reply(user_id, "你想问引用内容的哪一部分？", session)
                 return
@@ -299,6 +393,8 @@ class Bot:
             log.info("Request %s started (images=%s search=%s)", request_id, len(image_urls),
                      search_required)
             direct_sources = set(sources)
+            burst.prepared = {'text': text, 'urls': list(image_urls),
+                              'explicit_search': explicit_search, 'sources': direct_sources}
             sources.update(self.store.source_ids(session))
             state = ProgressState()
             task = asyncio.create_task(self.generate(session, alias, text, image_urls, query,
@@ -347,7 +443,8 @@ class Bot:
             mode = "文字与图片" if model and model.supports_images else "仅文字"
             model_info = f"\n当前模型：{alias}" if owner else ""
             engine = "Agent 2.0（自主工具调用）" if model and model.supports_tools else "兼容聊天"
-            result = f"当前私聊可用{model_info}\n已保存问答：{count} 轮\n模式：好友私聊 / {mode}\n引擎：{engine}"
+            merging = f"停顿 {self.cfg.message_merge_seconds:g} 秒合并" if self.cfg.message_merge_seconds else "逐条处理"
+            result = f"QQbot {__version__} · 当前私聊可用{model_info}\n已保存问答：{count} 轮\n模式：好友私聊 / {mode}\n引擎：{engine}\n会话：{merging} / 支持自然打断与更正"
         elif parts == ["/reset"]:
             self.clear_images(session)
             self.references.clear(session)

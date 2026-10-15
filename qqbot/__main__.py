@@ -9,6 +9,7 @@ from pathlib import Path
 
 import aiohttp
 
+from . import __version__
 from .bot import Bot
 from .config import load
 from .llm import LLM, ModelError, messages
@@ -39,7 +40,8 @@ def load_env_file(filename):
 
 
 async def main():
-    parser = argparse.ArgumentParser(description="QQbot 2.0 conversational agent")
+    parser = argparse.ArgumentParser(description="QQbot conversational agent")
+    parser.add_argument('--version', action='version', version=f'QQbot {__version__}')
     parser.add_argument("--env-file", help="Load a local env file without executing it; existing environment wins")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--check-config", action="store_true")
