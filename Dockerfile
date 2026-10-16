@@ -1,7 +1,8 @@
 FROM python:3.12-slim
 WORKDIR /app
 COPY requirements.runtime.txt ./
-RUN pip install --no-cache-dir -r requirements.runtime.txt \
+RUN pip install --no-cache-dir --upgrade pip==26.2.1 \
+    && pip install --no-cache-dir --retries 5 --resume-retries 5 -r requirements.runtime.txt \
     && useradd --uid 10001 --create-home bot && mkdir /data && chown bot:bot /data
 COPY pyproject.toml ./
 COPY qqbot ./qqbot

@@ -1,0 +1,10 @@
+[Unit]
+Description=Consistent QQbot database and configuration backup
+After=docker.service
+Requires=docker.service
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/qqbot
+ExecStart=/usr/bin/python3 /opt/qqbot/current/scripts/cloud/ops.py backup
+TimeoutStartSec=180
+UMask=0077

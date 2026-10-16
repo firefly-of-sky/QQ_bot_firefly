@@ -130,7 +130,7 @@ class TulpaIntegration(unittest.IsolatedAsyncioTestCase):
                 database=str(root/'chat.sqlite3'),models={'primary':Model('http://unused','fixture','UNUSED')},
                 default_model='primary',message_merge_seconds=.2,message_merge_max_seconds=1,
                 context_budget_bytes=200000,requests_per_minute=100)
-            env = {'TULPA_ROOT':str(root/'tulpa'),'TULPA_CONFIG':str(settings_path), 'TULPA_MCP_PORT':str(free_port()), 'TULPA_ADMIN_PORT':'0'}
+            env = {'TULPA_ROOT':str(root/'tulpa'),'TULPA_CONFIG':str(settings_path), 'TULPA_MCP_PORT':str(free_port()), 'TULPA_ADMIN_PORT':'0', 'QQBOT_HEALTH_PORT':'0'}
             async with aiohttp.ClientSession() as http:
                 with patch.dict(os.environ,env):
                     app = Application(cfg,model,http)
@@ -199,6 +199,17 @@ class TulpaIntegration(unittest.IsolatedAsyncioTestCase):
                         self.assertEqual(bad.get('error_code'),'invalid_arguments')
                         async with http.post(f'http://127.0.0.1:{app.relay.port}/get_login_info',json={}) as response:
                             self.assertEqual(response.status,401)
+                        # A failed worker is reattached by maintenance without
+                        # restarting the framework or disturbing another friend.
+                        first.task.cancel()
+                        await asyncio.gather(first.task,return_exceptions=True)
+                        await until(lambda:app.conversations.get(first.cid) is not first
+                                    and app.conversations[first.cid].ready.is_set(),timeout=20)
+                        self.assertIs(app.conversations[second.cid],second)
+                        before=len(remote.sent)
+                        await remote.emit('after worker recovery')
+                        await until(lambda:len(remote.sent)>before)
+                        self.assertEqual(remote.sent[-1]['user_id'],123)
                     finally:
                         task.cancel();await asyncio.gather(task,return_exceptions=True)
                         await runner.cleanup()

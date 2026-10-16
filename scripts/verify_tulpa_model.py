@@ -44,6 +44,7 @@ async def main():
     with tempfile.TemporaryDirectory(prefix='qqbot-tulpa-model-') as tmp:
         os.environ['TULPA_MCP_PORT']=str(free_port())
         os.environ['TULPA_ADMIN_PORT']='0'
+        os.environ['QQBOT_HEALTH_PORT']='0'
         os.environ['TULPA_ROOT']=str(Path(tmp)/'tulpa')
         os.environ['TULPA_CONFIG']=str(Path(tmp)/'absent.toml')
         cfg=replace(original,owner=123,token='fixture',database=str(Path(tmp)/'chat.sqlite3'),

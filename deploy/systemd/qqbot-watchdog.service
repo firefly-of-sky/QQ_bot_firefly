@@ -1,0 +1,9 @@
+[Unit]
+Description=QQbot process watchdog and login status report
+After=docker.service network-online.target
+Requires=docker.service
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/qqbot
+ExecStart=/usr/bin/python3 /opt/qqbot/current/scripts/cloud/ops.py watchdog
+TimeoutStartSec=90

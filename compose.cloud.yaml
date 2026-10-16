@@ -1,0 +1,55 @@
+name: qqbot-cloud
+x-logging: &logging
+  driver: local
+  options:
+    max-size: "10m"
+    max-file: "3"
+services:
+  napcat:
+    image: ${NAPCAT_IMAGE:?Pin a tested NapCat image before cloud deployment}
+    restart: unless-stopped
+    init: true
+    environment:
+      MODE: ws
+      WEBUI_TOKEN: ${WEBUI_TOKEN:?Configure WEBUI_TOKEN}
+      TZ: Asia/Shanghai
+    ports:
+      - "127.0.0.1:6099:6099"
+    volumes:
+      - ./data/qq:/app/.config/QQ
+      - ./data/napcat:/app/napcat/config
+      - ./data/plugins:/app/napcat/plugins
+    mem_limit: ${NAPCAT_MEMORY_LIMIT:-1800m}
+    cpus: 1.25
+    pids_limit: 512
+    logging: *logging
+  bot:
+    image: ${QQBOT_IMAGE:?Load the versioned QQbot release image}
+    restart: unless-stopped
+    init: true
+    env_file: .env
+    environment:
+      ONEBOT_URL: ws://napcat:3001
+      DATABASE_PATH: /data/chat.sqlite3
+      CONFIG_PATH: /app/config.toml
+      TULPA_ROOT: /data/tulpa
+      QQBOT_HEALTH_PORT: "18080"
+      TZ: Asia/Shanghai
+    volumes:
+      - ./config.toml:/app/config.toml:ro
+      - ./personas:/app/personas:ro
+      - ./tulpa.toml:/app/tulpa.toml:ro
+      - ./data/bot:/data
+    mem_limit: ${QQBOT_MEMORY_LIMIT:-1100m}
+    cpus: 1.0
+    pids_limit: 256
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "python", "-m", "qqbot.health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    depends_on:
+      - napcat
+    logging: *logging

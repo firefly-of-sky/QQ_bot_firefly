@@ -8,6 +8,7 @@ import time
 
 from ..onebot import OneBot, DeliveryError
 from ..store import Store
+from ..health import RuntimeHealth
 from ..turns import control, plain_text
 from .backend import Backend
 from .relay import Relay
@@ -32,6 +33,8 @@ class Application:
         self.last_directory = 0
         self.backend = None
         self.tasks = []
+        self.health = RuntimeHealth(self)
+        self.recovery_at = {}
 
     async def directory(self):
         login = await self.transport.action('get_login_info',{})
@@ -52,9 +55,7 @@ class Application:
         old = self.conversations.get(cid)
         if old and not old.task.done():
             return old
-        if old:
-            self.conversations.pop(cid,None)
-        if len(self.conversations)>=self.settings['max_sessions']:
+        if old is None and len(self.conversations)>=self.settings['max_sessions']:
             idle = sorted((c for c in self.conversations.values() if not c.turn_task),key=lambda c:c.last_event)
             if not idle:
                 raise RuntimeError('All Tulpa chat slots are busy')
@@ -63,10 +64,16 @@ class Application:
         conversation = Conversation(self,cid,grant)
         self.conversations[cid] = conversation
         conversation.task = asyncio.create_task(conversation.run())
-        await asyncio.wait_for(conversation.ready.wait(),15)
-        if conversation.error:
-            self.conversations.pop(cid,None)
-            raise RuntimeError('Tulpa session unavailable')
+        try:
+            await asyncio.wait_for(conversation.ready.wait(),15)
+            if conversation.error:
+                raise RuntimeError('Tulpa session unavailable')
+        except BaseException:
+            conversation.task.cancel()
+            await asyncio.gather(conversation.task,return_exceptions=True)
+            if old:self.conversations[cid] = old
+            else:self.conversations.pop(cid,None)
+            raise
         return conversation
 
     async def remove(self, conversation):
@@ -112,6 +119,14 @@ class Application:
         while True:
             await asyncio.sleep(5)
             for c in list(self.conversations.values()):
+                if c.task.done() and time.monotonic() >= self.recovery_at.get(c.cid,0):
+                    self.recovery_at[c.cid] = time.monotonic()+30
+                    try:
+                        await self.ensure(str(c.uid))
+                        log.info('Conversation worker recovered')
+                    except Exception as exc:
+                        log.warning('Conversation recovery pending (%s)',type(exc).__name__)
+                    continue
                 if c.cid in self.rotate and c.turn_task is None:
                     self.rotate.discard(c.cid)
                     await self.remove(c)
@@ -122,11 +137,14 @@ class Application:
     async def run(self):
         if not all(m.supports_tools for m in self.cfg.models.values()):
             raise ValueError('Tulpa resident agents require models with native tools support')
+        await self.health.start()
         await self.relay.start()
         self.tasks = [asyncio.create_task(self.transport.run(lambda _:False,on_event=self.relay.receive)),
                       asyncio.create_task(self.transport.monitor()),
-                      asyncio.create_task(self.relay.publish()),asyncio.create_task(self.relay.watch())]
+                      asyncio.create_task(self.relay.publish()),asyncio.create_task(self.relay.watch()),
+                      asyncio.create_task(self.health.heartbeat())]
         try:
+            self.health.stage = 'waiting_qq_login'
             while True:
                 try:
                     await self.directory()
@@ -134,6 +152,7 @@ class Application:
                 except (DeliveryError,TypeError,KeyError):
                     log.info('Waiting for QQ login and friend directory')
                     await asyncio.sleep(5)
+            self.health.stage = 'starting_framework'
             root = Path(os.environ.get('TULPA_ROOT',Path(self.cfg.database).parent/'tulpa'))
             self.backend = Backend(root,self.relay,port=int(os.environ.get("TULPA_MCP_PORT","18777")))
             policy = dict(quiet_seconds=max(.1,self.cfg.message_merge_seconds),
@@ -160,9 +179,11 @@ class Application:
 
                 await self.ensure(str(self.cfg.owner))
             self.tasks.append(asyncio.create_task(self.maintenance()))
+            self.health.stage = 'running'
             log.info('QQbot Tulpa runtime ready; MCP=%s', self.backend.url)
             await asyncio.gather(*self.tasks)
         finally:
+            self.health.stage = 'stopping'
             for c in list(self.conversations.values()):
                 c.task.cancel()
             await asyncio.gather(*(c.task for c in self.conversations.values()),return_exceptions=True)
@@ -172,4 +193,5 @@ class Application:
             if self.backend:
                 await self.backend.close()
             await self.relay.close()
+            await self.health.close()
             self.store.close()
