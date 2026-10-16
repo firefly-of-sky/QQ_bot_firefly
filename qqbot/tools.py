@@ -113,7 +113,7 @@ def encode_result(value, limit):
         return text
     # Keep valid JSON even when a tool returned more than the available budget.
     excerpt = text.encode()[:limit // 2].decode(errors="ignore")
-    result = {"ok": value.get("ok", True), "truncated": True, "data_excerpt": excerpt}
+    result = {"ok": value.get("ok", True) if isinstance(value, dict) else True, "truncated": True, "data_excerpt": excerpt}
     while len(json.dumps(result, ensure_ascii=False).encode()) > limit:
         result["data_excerpt"] = result["data_excerpt"][:len(result["data_excerpt"]) // 2]
     return json.dumps(result, ensure_ascii=False)

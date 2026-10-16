@@ -1,0 +1,88 @@
+{
+  "schema": 1,
+  "version": "1.14.22",
+  "source_commit": "87527cb7641a5a42f8f0efb73cb066102e004dee",
+  "adapter": "snowluma-local-1.14.22",
+  "mode": "user_selected_local_directory",
+  "docker": {
+    "repository": "motricseven7/snowluma",
+    "tag": "v1.14.22",
+    "platforms": {
+      "amd64": "sha256:ef2e593837a1d7241a611338f57e787ff6a1340f29d01ff2423590be9a83c83c",
+      "arm64": "sha256:d601094896a1a80392e0d6a6ec6611b62414c851685d6c82eb88dfefeaf8446c"
+    }
+  },
+  "release_url": "https://github.com/SnowLuma/SnowLuma/releases/tag/v1.14.22",
+  "required_files": [
+    "index.mjs",
+    "node.exe",
+    "package.json",
+    "EULA.md",
+    "PRIVACY.md",
+    "native/snowluma-win32-x64.dll",
+    "native/snowluma-win32-x64.node",
+    "native/websocket-win32-x64.node",
+    "native/ffmpeg/ffmpegAddon.win32.x64.node"
+  ],
+  "agreements": [
+    {
+      "id": "eula",
+      "title": "SnowLuma 使用细则",
+      "version": "1.1",
+      "file": "EULA.md",
+      "url": "https://github.com/SnowLuma/SnowLuma/blob/v1.14.22/EULA.md",
+      "sha256": "373c4f7c5d87da116fa4444ce45b3f41a0cf238ec4ee3f993a2123bfc945a5b6"
+    },
+    {
+      "id": "privacy",
+      "title": "SnowLuma 隐私政策",
+      "file": "PRIVACY.md",
+      "url": "https://github.com/SnowLuma/SnowLuma/blob/v1.14.22/PRIVACY.md",
+      "sha256": "d36474445ce510e27e64fbe76609cc088c75b1dfa3dfb6c257241598749f08fd"
+    }
+  ],
+  "scope": [
+    "configure_user_selected_directory_in_place",
+    "backup_existing_config_before_write",
+    "loopback_admin_http_ws",
+    "manage_random_credentials",
+    "bind_one_selected_qq_process",
+    "resume_same_verified_account"
+  ],
+  "compatibility": {
+    "managed": [
+      "1.14.22"
+    ],
+    "existing_import": [
+      "1.14.19",
+      "1.14.20",
+      "1.14.21",
+      "1.14.22"
+    ],
+    "real_pc_verified": false
+  },
+  "linux_required_files": {
+    "x64": [
+      "index.mjs",
+      "node",
+      "package.json",
+      "EULA.md",
+      "PRIVACY.md",
+      "native/snowluma-linux-x64.so",
+      "native/snowluma-linux-x64.node",
+      "native/websocket-linux-x64.node",
+      "native/ffmpeg/ffmpegAddon.linux.x64.node"
+    ],
+    "arm64": [
+      "index.mjs",
+      "node",
+      "package.json",
+      "EULA.md",
+      "PRIVACY.md",
+      "native/snowluma-linux-arm64.so",
+      "native/snowluma-linux-arm64.node",
+      "native/websocket-linux-arm64.node",
+      "native/ffmpeg/ffmpegAddon.linux.arm64.node"
+    ]
+  }
+}

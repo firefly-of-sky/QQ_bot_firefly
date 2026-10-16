@@ -1,8 +1,13 @@
 FROM python:3.12-slim
 WORKDIR /app
+COPY requirements.runtime.txt ./
+RUN pip install --no-cache-dir -r requirements.runtime.txt \
+    && useradd --uid 10001 --create-home bot && mkdir /data && chown bot:bot /data
 COPY pyproject.toml ./
 COPY qqbot ./qqbot
-RUN pip install --no-cache-dir . && useradd --uid 10001 --create-home bot && mkdir /data && chown bot:bot /data
+COPY vendor/tulpa ./vendor/tulpa
+COPY tulpa.toml ./tulpa.toml
+RUN python -m compileall -q qqbot && pip install --no-cache-dir --no-deps .
 USER bot
 ENV PYTHONUNBUFFERED=1 CONFIG_PATH=/app/config.toml DATABASE_PATH=/data/chat.sqlite3
 CMD ["python", "-m", "qqbot"]

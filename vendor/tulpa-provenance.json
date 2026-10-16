@@ -1,0 +1,9 @@
+{
+  "repository": "https://github.com/fumingyang2004/Tulpa",
+  "commit": "0090b27fad42428c72e5cbaa903a140ca6bd51d4",
+  "license": "MIT",
+  "patches": [
+    "chatlocal/config.py: TULPA_ROOT environment override for immutable source and persistent runtime data",
+    "chatlocal/mcp_chat_media.py: recognize RFC 6145 IPv4-translated TUN fake DNS addresses; retain authenticated DNS resolution and public-address checks"
+  ]
+}

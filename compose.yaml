@@ -20,6 +20,7 @@ services:
     volumes:
       - ./config.toml:/app/config.toml:ro
       - ./personas:/app/personas:ro
+      - ./tulpa.toml:/app/tulpa.toml:ro
       - bot-data:/data
     depends_on:
       - napcat

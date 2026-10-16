@@ -1,0 +1,154 @@
+# 外部 Agent / MCP
+
+从旧版本升级：先看 [保留数据升级教程](UPGRADE.md)，可将其中的指令交给本机 Codex / DSH。原目录更新会保留 MCP 端口、凭据和读取进度，无需重新导入；新增能力仍需主动授权。
+
+0.4.0 起内置于 Windows 桌面包；0.5.0 增加 [独立轻量版](MCP_LITE.md) 与按连接持续授权的 QQ 写操作，也保留源码运行方式。
+
+Tulpa 可以作为本机资料服务，让 Codex 或其他支持 **Streamable HTTP MCP + Bearer Token** 的客户端直接查询已导入的 QQ / 微信资料。外部 Agent 自己决定如何调查、写报告或修改它的工作目录；Tulpa 提供检索、上下文和来源，不再调用一个内部模型替它回答。
+
+首次接入请看 [Agent 配置教程](AGENT_SETUP.md)：包含 Codex、Claude Code、DeepSeek Harness、Antigravity、WorkBuddy 的逐步操作、完整配置示例、连接验证和排错，也可将文末指令交给本机 Agent 执行。本页保留 Tulpa 服务、权限和工具的详细说明。
+
+## 从零连接（桌面版）
+
+1. 完整解压 0.4.0 或更新版本，打开 `Tulpa.exe`，首次选择 **连接外部 Agent**。只使用 MCP 无需模型 API Key。
+2. 先登录 QQ / 微信，在 **数据与同步** 选择账号并导入资料。可以先导入少量近期消息，不需要等整个历史读完。来源账号确定后再授权，避免首次导入改变来源让旧凭据失效。
+3. 打开 **外部 Agent / MCP**。无需先启用、再保存服务设置，后面的创建按钮会一并完成。默认地址 `http://127.0.0.1:18777/mcp`；遇到端口冲突，点击旁边的 **修改服务端口**，在高级设置中调整。
+4. 填写连接名称，明确选择平台、会话和日期。不选会话不会默认授权全部；只有勾选“全部会话”才包含未来入库的会话。截止日期留空才包含未来消息。
+5. 按需要开放图片、文件下载解析、本地转写和 OneBot 群资料。发送、群管理是其下方的独立权限，勾选后直接执行，无需逐项审批；所有可选权限默认关闭。OneBot 在 **模型与连接 → QQ 扩展 / OneBot** 配置并检测，MCP 直接复用，无需再次填写。SnowLuma 等服务仍需独立运行；未配置 OneBot 不影响本地聊天查询。
+6. 点击 **创建连接凭据**，再点击 **检测连接与工具**。如果尚未开启服务，此处显示 **开启服务并创建连接**，可直接完成这两步；端口冲突等原因显示在按钮旁，已填写的范围会保留。检测实际执行 MCP 初始化、工具列表和资料状态读取，不调用模型。
+7. Codex 用户可以审阅显示的配置，再点击 **写入本机 Codex 配置**。程序使用 `CODEX_HOME` 或用户目录下 `.codex/config.toml`，备份原文件并保留其他条目；已有不同的 `tulpa` 连接时拒绝覆盖。之后在 Codex 的 MCP 设置中重新连接，必要时重启 Codex。也可复制配置自行安装。
+8. 其他客户端选择 **Streamable HTTP**，填写显示的 MCP 地址，并设置 `Authorization: Bearer <显示的 MCP Token>`。这是 Tulpa 的访问凭据，不能用 OneBot Token 替代。连接凭据只显示一次；丢失后撤销重建。
+9. 保持 Tulpa 运行。勾选“关闭窗口后留在托盘”可继续提供 MCP 和实时读取；右键托盘图标可开机启动或彻底退出。重新打开沿用已保存的地址和授权，不必每次配置。
+
+源代码开发仍可执行 `setup.ps1` / `start.ps1`，然后打开同样的 MCP 页面。开发目录与便携包的配置、资料和授权独立，不自动迁移。
+
+## DeepSeek Harness
+
+独立的 DeepSeek 客户端见 [DeepSeek Harness 部署与实测](DEEPSEEK_MCP.md)。已用官方 Harness 调用全部 23 个资料工具，并由真实 DeepSeek 模型完成跨来源任务，无需经过 Codex。
+
+## Codex 配置
+
+将 Tulpa 生成的配置加入自己的 Codex `config.toml`。Windows 通常位于 `$env:USERPROFILE\.codex\config.toml`；不要提交到项目仓库。同名配置已经存在时替换该段，不能重复写两个 `[mcp_servers.tulpa]`。
+
+```toml
+[mcp_servers.tulpa]
+url = "http://127.0.0.1:18777/mcp"
+http_headers = { Authorization = "Bearer 替换成界面刚生成的Token" }
+tool_timeout_sec = 240
+```
+
+也可以用 Codex 支持的 `bearer_token_env_var` 从环境变量读取 Token，替代 `http_headers`。环境变量必须在启动 Codex 的进程中可见。
+
+重新连接后，可以让 Agent 执行：
+
+> 先检查 Tulpa 当前允许查询的资料范围和数据时点，再调查课程设计的提交要求。核对聊天上下文和相关文件，区分明确要求与未确定事项，把报告写到我的当前工作目录，并保留来源链接。
+
+工作目录写入由 Codex 自身权限控制；MCP 没有开放 Tulpa 工作区成果写入。如果客户端还没加载新工具，重连或重启该客户端；仅保存配置不会让已经运行的一轮任务自动得到工具。
+
+[Codex MCP 官方说明](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)。其他客户端分别填写 URL、Bearer Token，并选择 Streamable HTTP。当前不提供 STDIO、旧 HTTP SSE 或公网接口。
+
+## 工具与读取流程
+
+| 能力 | 工具 |
+| --- | --- |
+| 资料范围和时点 | `get_data_status` |
+| 会话、人物与本人账号 | `list_conversations`、`find_people`、`get_my_identity`、`read_person_messages`、`find_mentions` |
+| 消息与上下文 | `search_messages`、`get_context`、`read_conversation`、`read_overview`、`get_messages_since`、`read_message` |
+| 结构化调查 | `query_communication_db`、`get_interaction_threads` |
+| 文件 | `search_files`、`search_file_content`、`read_file_chunks`；可选 `download_file` 下载原文件交给外部 Agent、`prepare_file` 提取文字 |
+| 图片和语音 | `get_media`；可选 `read_image`、`transcribe_voice` |
+| OneBot QQ 资料 | 有权限且连接可用时出现 `get_group_knowledge`、`read_qq_group` |
+| QQ 直接操作 | 可选 `send_qq_message`、`manage_qq_group`；`get_qq_operation` 查询回执 |
+| 持续群聊/好友私聊（OneBot 实时事件） | 可选 `list_chat_groups`、`list_chat_friends`、`list_chat_personas`、`start_chat_session`、`get_chat_session`、`list_chat_sessions`、`wait_chat_messages`、`send_chat_message`、`stop_chat_session` |
+| 持续群聊 · 图片和表情包 | 独立授权的 `import_chat_image`、`read_chat_image`、`list_chat_stickers`、`read_chat_sticker`、`note_chat_sticker`、`send_chat_sticker`、`collect_chat_sticker` |
+| SL 扩展 | `get_qq_capabilities`、`import_qq_media`、`read_chat_attachment`、`list_qq_voice_characters` 及八类 `qq_*` 动作工具；见 [SL 扩展工具](SL_TOOLS.md) |
+
+这些工具复用 Tulpa 的检索、受限 SQL、人物解析与文件系统。发送和群管理仅对界面勾选授权的连接开放，调用即执行；没有模型审批或权限修改工具，也没有工作区写入工具。完整规则见 [轻量版与持续授权](MCP_LITE.md#勾选就是持续授权)。
+
+工具直接返回结构化资料，不要求外部模型生成 Tulpa 的 `claims` 格式。`sources` 标注消息、文件片段、统计回执等身份；公告正文在 `entries` 中。消息和文件的本机链接可跳回 Tulpa。启动后尚未打开过 MCP 设置时，来源网址可能为空，引用编号仍可用于继续查询。
+
+`read_image` 返回已缓存图片的 MCP 图像内容（最多 1800×1800，GIF 最多抽取 3 帧），由外部模型理解；不会调用 Tulpa 的云端识图。语音沿用本地转写，文字可能有误听。无图片权限时只返回元数据；不自动下载所有附件。
+
+OneBot 仅用于已授权 QQ 群。公告、精华和文件来源继续执行日期过滤；时间未知的来源不会进入限定日期的结果。群信息和成员目录是**查询当时的状态**，不是历史日期的成员快照。启用时会在 UI 明确说明。其他只读工具仍可能查到授权范围内已经缓存的 QQ 资料，关闭 OneBot 权限阻止的是该连接主动刷新和调用其专用工具。
+
+## 持续群聊（SnowLuma 实时事件）
+
+仅向 MCP 开放；完整版启动器与 MCP 轻量版共用实现，不调用 Tulpa 内置模型。新消息走 `QQ → SnowLuma OneBot WebSocket → 独立事件缓存 → 外部 Agent`，无需导入聊天或开启数据库实时读取。历史调查、关注卡和工作区继续走原有资料系统。
+
+1. 保持 QQ、SnowLuma 和 Tulpa 运行。在 SnowLuma 的当前账号下开启正向 WebSocket 节点：本机地址、事件上报或 Universal、数组消息格式。建议开启本人消息上报。
+2. 在 Tulpa **OneBot 设置** 保存 HTTP 地址/Token，以及 **实时事件地址**（例如 `ws://127.0.0.1:3001/`）/事件 Token。HTTP 与 WebSocket 的 Token 可能不同，务必分别核对；事件 Token 尚未设置时才回退 HTTP Token。点击保存并检测，确认事件接收已连接。
+3. 在 **连接外部 Agent** 选择 QQ；可点 **从 OneBot 选择群 · 无需导入**。勾选持续群聊和发送权限，明确选择目标群或允许全部 QQ 会话。截止日期留空可包含未来消息。旧连接不会自动增加权限。
+4. 重新连接外部客户端以加载工具。在专用 Agent 对话中输入：
+
+   > 在“测试群”持续聊天，直到我停止。人格提示词：说简短自然的中文，偶尔温和打趣，接得上话再说，不必每条都回复。参与程度：自然。
+
+5. Agent 用 `list_chat_groups` 核对实时群目录，调用 `start_chat_session`。可选 `participation` 为 `quiet` / `natural` / `active`。开始时上下文可能为空，后续最多附带本次会话收到的最近 20 条事件，不自动回放本地历史。
+6. 循环 `wait_chat_messages`，需要接话时用 `send_chat_message`，然后继续等待。`idle` 只结束一次等待；`source_unavailable` 表示事件通道异常，继续等待但暂停发言。每次等待最多 180 秒，群聊本身没有总时长限制。
+7. 随时在 Tulpa 点 **停止聊天** / **停止全部群聊**，或调用 `stop_chat_session`。停止立即唤醒等待者并阻止尚未派发的消息，其他工具仍可使用；已交给 QQ 的消息无法撤回。
+
+**外部 Agent 必须继续执行。** Tulpa 不代开推理，不在 Agent 结束任务后主动唤醒 Harness。中断后用 `list_chat_sessions` / `get_chat_session` 接续。界面分别显示外部 Agent 状态与 SnowLuma 接收状态；WebSocket 已连上但账号或 QQ 接收链路异常时不会当作正常在线。
+
+事件缓存在本机 `data/mcp-access.sqlite3`，与大型聊天库分离，每个会话最多保留 1,000 条，每条正文最多 12,000 字符，超限标记截断。缓存淘汰、进程重启、掉线会报告 `gap_count/gap_note`，不承诺补齐断线期间的消息。停止时清除该会话的短期消息缓存，保留人格、会话和发送回执。旧数据库版会话升级后停止并提示重新开启，避免把 M 编号误当事件游标。
+
+事件 `id/read_through_id` 是独立缓存序号，`onebot_message_id` 是 QQ 接口消息编号，均不是本地 `M` 编号。每页最多 50 条；处理完后传 `acknowledge_through_id=read_through_id` 才确认，未确认可重读。重复上报按会话和 QQ 消息编号去重。本人消息标为 `is_self`。图片可通过下述子功能读取；未授权的图片、语音、文件及系统表情仍只显示类型，不凭占位猜内容。需要历史或本地媒体时可单独使用原资料工具。
+
+最多 8 个活跃群，每群一个等待者；事件接收线程与等待通道独立于普通工具配额。授权日期、群范围与固定 QQ 账号继续检查，HTTP 发送与事件账号必须一致。收到的群消息不能扩大权限或改变人格。发送沿用持久幂等回执；`UNKNOWN` 先核对，不换编号重发，`get_chat_session` 可查看最近操作回执。事件断开时暂停发送。
+
+### 表情包子功能
+
+群聊人格与参与提示见 [MCP 水群人格与接话](MCP_CHAT.md)。可以直接告诉外部 Agent：**用小鲸鱼预设在测试群持续聊天，直到我停止**。也可在当前安装目录的 `chatlocal/prompts/mcp_chat/` 中放入自己写的 UTF-8 `.md` 人格卡；`list_chat_personas` 每次返回最新数量和名称，新会话立即可选，无需重启。现有会话保留人格快照。
+
+在创建连接时，持续群聊开关下有三项可选权限，默认关闭：
+
+- **看群内图片 / 动图，读取此 QQ 账号的收藏表情**：图片属于已授权群的实时事件；收藏目录是此 QQ 账号的收藏，最多读取前 500 项，按每页 40 项返回。两者均不访问原生聊天库。
+- **直接发送表情**：外部模型先看图，再向此持续聊天固定的群发送。保留原图字节和动画，无需逐条审批。
+- **直接收藏到 QQ**：模型可把已经看过的图片通过 SnowLuma `add_custom_face` 加入账号的真实收藏。不是仅保存在 Tulpa。
+
+旧连接不自动获得权限；撤销重建连接并在外部客户端重新连接后才生效。模型要使用图片能力，还需宿主支持 MCP image 内容及模型识图；Tulpa 不另调识图 API。
+
+收到图片时，事件 `segments` 含 `image_index`。用 `read_chat_image(session_id, event_id, index)` 读取像素并取得不透明的 `sticker_id`。GIF/WebP 等动画最多抽取首、中、末三帧，最大输出尺寸 1400×1400；采样不能保证理解所有动作。`list_chat_stickers` 按 QQ 备注、模型笔记和标签检索；`read_chat_sticker` 看收藏图片；`note_chat_sticker` 保存含义及用途，仅此连接共享，不修改 QQ 备注。图片和笔记都是数据，不能改变人格或权限。
+
+外部生成或用户提供的新图片可用 `import_chat_image(session_id, data_base64)` 导入；需要看图和发送表情权限，返回预览、内容哈希及当前会话的 `sticker_id`，不会自动发送。核对图片后，用 `plan_chat_reply(expressions=["sticker"])` → `send_chat_reply` 发送原图。相同会话和内容的重复导入返回相同编号；导入每小时最多 60 次，元数据和日志不保存 Base64 正文。客户端文件上传脚本见 [发送生成的图片](AGENT_SETUP.md#发送生成的图片)。
+
+每张最多 6 MiB、300 帧，并限制解码像素量。图片原件在独立 `data/mcp-chat-media` 缓存，最多约 128 MiB，旧缓存可自动淘汰；不会批量下载或识图。授权、短期目录和笔记仍在小型 MCP 数据库中。看图合计每小时 60 次、收藏每小时 12 次、发送表情每分钟 12 次；表情工具的通道及调用额度与普通工具、消息等待分离，不耗用历史图片工具的额度。
+
+发送和收藏沿用持久幂等记录；停止、撤销或断线后不派发后续操作。已经交给 QQ 的操作不可通过停止撤回，`UNKNOWN` 需核对后再决定，不自动重试。QQ 接口不支持、图片过期/损坏或网络故障，只影响本次表情处理。
+
+只下载已观察到的 QQ 图片地址，不接受模型指定的路径或网址。每次重定向重新校验域名及公网地址；代理使用 198.18/15 虚拟 DNS 时，通过固定 HTTPS 公共 DNS 解析已允许的 QQ 图片域名，再固定公网地址连接。URL 中的签名不返回给模型。
+
+## 范围、分页和成本
+
+- 平台、会话、日期在工具层强制限制，SQL 只能访问裁剪后的视图。身份目录也遵守日期范围。按同平台稳定账号连接人物，不能按同名跨平台认人。
+- 历史资料权限固定绑定当前数据源 epoch 和平台账号，来源改变后需重新授权。持续群聊独立绑定创建连接时的 OneBot QQ 账号、群与日期范围，不依赖历史库 epoch；切换 QQ 账号不能继续使用原账号的群聊授权。缩小范围采用“撤销旧连接，再创建新连接”。
+- 没有“一个任务最多处理 40 / 300 条消息”的限制。每页仍有数量和大小限制；外部 Agent 可以持续分页，任务预算由外部客户端控制。
+- 消息分页沿用 `snapshot_max_id`、排序方式和 `next_offset`。上界只排除之后新入库的消息，不能冻结已有消息的修改和删除，不应当作完整历史快照。长消息正文用 `read_message` 按字符继续读。
+- 密集消息页达到字符预算时，只推进实际返回的消息前缀。取样概览、交互候选和关键词筛选仍不能宣称覆盖全部历史。
+- 每连接每分钟最多 120 次工具调用；每小时最多解析文件 12 次、转写语音 12 次、读取图片 60 次。限额持久保存，重连不会重置。单文件仍限制为 32 MiB。失败尝试也计入限额。
+- 单调用总超时 240 秒，普通工具并发处理最多 4 个，持续群聊等待另有独立通道；取消会传给现有读取/语音流程。已经开始的文件解析可能完成本地缓存，但取消或撤销后不会返回其结果。不自动重试或扩大范围。
+- `get_messages_since` 是新增消息补查，不是统一变化流订阅。旧语音完成、文件重解析等更新，当前需要重新读取相关资料；本阶段未增加外部持续维护游标。
+
+MCP 不会为了普通文本调查请求 Tulpa 的模型。外部 Agent 获取到的必要内容会进入该客户端上下文，并可能发送给它的模型服务；撤销不能收回已经返回给客户端的内容。
+
+## 运行和安全边界
+
+服务随现有 Tulpa 应用启动，默认关闭，只绑定 `127.0.0.1`，与网页使用不同端口。校验 Host、Origin、Bearer Token 和请求大小；不开放网络地址、任意路径或 Shell 参数。设置 API 只供本机 UI 使用，不作为模型工具。
+
+`data/mcp-access.sqlite3` 保存配置、Token 哈希、授权范围和访问记录；普通读取日志不保存聊天正文和明文 Token；写操作另外保存目标、实际文字、状态及发送回执。数据库属于本机私人数据，不进入 Git 或发布包。访问记录包含工具、时间、耗时和返回的消息数量。
+
+持续群聊也在这个私人数据库保存有界实时事件缓存、人格、会话状态、事件游标和外部 Agent 提交的话题说明。服务重新启动不会将旧心跳当作 Agent 已重新在线。
+
+每个 Tulpa 数据目录独立授权。开发目录和 release 目录的聊天、连接和配置不会自动互通；两个实例同时使用 MCP 时必须选择不同端口。
+
+这是 **MCP 接口的访问控制**，不是对整台电脑的操作系统沙箱。拥有同一 Windows 用户文件读取权限的外部 Agent，可能通过它自己的文件/Shell 工具读取本机文件；若要形成更强隔离，仍需在外部客户端或系统层限制那些能力。
+
+Tulpa 不主动自动回复、不改写原始聊天，也没有外部 Agent 自己批准或扩张范围的工具。写操作由持有已授权连接的外部 Agent 发起，本机立即执行并记录。此阶段不更改 Tulpa 原有关注卡与工作区调度。
+
+## 验证与当前限制
+
+运行 `scripts/check_mcp.py` 可使用官方 MCP Python 客户端对真实 HTTP 服务复现协议验收。隔离夹具覆盖消息/文件/SQL 范围、520 条持续分页、长页续读、图像内容、模拟 OneBot 资料、取消、撤销、账号变更、持久配额与服务关闭。
+
+验收时另外用真实浏览器操作了设置界面：服务开关、平台/会话选择、凭据创建、关闭、重开、撤销。截图和私人资料测试结果保存在被忽略的 `reports/private/mcp/`，不随源码发布。
+
+真实资料验收通过原 release 数据库的只读 SQLite 备份进行：QQ 会话 2,092 条、微信会话 494 条，各读取最新 5 条及相邻上下文，并用 MCP 受限 SQL 核对范围计数；协议过程耗时约 3.5 秒，未调用云端模型。未改动原数据库，验收连接已撤销。开发目录当时是空库，未将空库检查当作真实资料验收。
+
+用户可主动将连接写入本机 Codex；程序不会自动替用户授权。集成测试使用隔离配置目录，不修改开发者的真实 Codex 配置。协议验证不代表已完成某个外部模型的复杂真实任务。不同 MCP 客户端对图像、取消、超时的支持仍需逐个核对。标准接口可连接不等于所有客户端行为都完全一致。

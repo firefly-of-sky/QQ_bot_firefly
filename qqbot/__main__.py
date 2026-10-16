@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import shlex
+import signal
 from dataclasses import replace
 from pathlib import Path
 
@@ -103,21 +104,15 @@ async def main():
                 raise SystemExit(str(exc))
             print("模型调用成功，已收到文字回复。")
             return
-        store = Store(cfg.database)
-        transport = OneBot(http, cfg.ws_url, cfg.token)
-        bot = Bot(cfg, store, llm, transport)
-        try:
-            async with asyncio.TaskGroup() as group:
-                group.create_task(transport.run(bot.accepts, bot.recall))
-                group.create_task(bot.worker())
-                group.create_task(transport.monitor())
-        finally:
-            await bot.close()
-            store.close()
+        from .tulpa.app import Application
+        asyncio.get_running_loop().add_signal_handler(signal.SIGTERM,asyncio.current_task().cancel)
+        await Application(cfg, llm, http).run()
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    for logger in ('httpx','mcp'):
+        logging.getLogger(logger).setLevel(logging.WARNING)
     try:
         asyncio.run(main())
     except KeyboardInterrupt:

@@ -1,0 +1,12 @@
+[conversations]
+# Continue accepting existing QQ friends; groups/temporary chats stay disabled.
+friends = "all" # or "owner"
+max_sessions = 8
+idle_seconds = 300
+
+# Optional additional MCP tools, discovered on connection; no Python changes.
+# Add only servers you trust. Tools execute with that server's own permissions.
+# [mcp_servers.knowledge]
+# url = "https://your-server.example/mcp"
+# token_env = "KNOWLEDGE_MCP_TOKEN"
+# tools = ["search", "lookup"] # omit to expose every tool from this server

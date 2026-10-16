@@ -1,0 +1,43 @@
+{
+  "version": "3.0.0",
+  "upstream_commit": "0090b27fad42428c72e5cbaa903a140ca6bd51d4",
+  "tests": {
+    "macos_python_3_14": 137,
+    "linux_arm64_python_3_12": 137,
+    "upstream_planner_protocol_groups": 17,
+    "upstream_media": "passed"
+  },
+  "real_model": [
+    {
+      "case": "arithmetic",
+      "expected": "493",
+      "tools": [
+        "calculate",
+        "plan_chat_reply",
+        "send_chat_reply"
+      ]
+    },
+    {
+      "case": "message_burst",
+      "expected": "青羽/615",
+      "reply_count": 1
+    },
+    {
+      "case": "correction",
+      "expected": "827",
+      "reply_count": 1
+    }
+  ],
+  "qq_client_checks": {
+    "status": "3.0.0 Tulpa MCP",
+    "three_message_burst": "白鹭/921",
+    "natural_stop": "confirmed; no story tail",
+    "container_restart": "雾松482",
+    "image": "8246/3/2"
+  },
+  "isolated_extension": {
+    "discovered": "fixture__nested_sum",
+    "nested_array_call_result": 16
+  },
+  "notes": "Synthetic acceptance content only. No credentials, raw user messages or QQ account IDs in this report."
+}
