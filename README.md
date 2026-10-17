@@ -1,6 +1,6 @@
 # QQbot 4.0 · Tulpa 会话机器人
 
-4.0 增加独立的云端部署配置、进程与 QQ 就绪状态检查、异常会话恢复、定时备份和版本切换，适配 2 核 4 GiB 服务器。云端安装与日常操作见 [云端运行说明](docs/cloud.md)。云端真实上线状态以部署验收记录为准。
+4.0 增加独立的云端部署配置、进程与 QQ 就绪状态检查、异常会话恢复、定时备份和版本切换，适配 2 核 4 GiB 服务器。云端安装与日常操作见 [云端运行说明](docs/cloud.md)，实际完成的测试与边界见 [4.0 部署验收](docs/v4.0.0.md)。
 
 当前默认运行时已迁移到 [Tulpa](https://github.com/fumingyang2004/Tulpa) 的真实 MCP 服务。Tulpa 管理会话、人格快照、消息批次、回复规划、权限和发送回执；QQbot 作为常驻外部 Agent 驱动模型，并提供模型配置、QQ 接入及附加工具。
 
@@ -93,4 +93,4 @@ docker compose exec bot python -m qqbot.tulpa.admin events
 .venv/bin/python -m scripts.verify_tulpa_model
 ```
 
-[2.1 原使用说明](docs/README-2.1.md) 保留用于回退和兼容 CLI。旧版 Git 提交 `aad1f99` 与本机镜像 `qqbot-bot:2.1.0-rollback` 可恢复旧运行时；回退前停止新版，保留两个数据库，禁止同时运行两个回复进程。Mac 睡眠、Docker 停止或 QQ 登录失效时，机器人无法保持工作。
+[2.1 原使用说明](docs/README-2.1.md) 保留用于回退和兼容 CLI。旧版 Git 提交 `aad1f99` 与本机镜像 `qqbot-bot:2.1.0-rollback` 可恢复旧运行时；回退前停止新版，保留两个数据库，禁止同时运行两个回复进程。本机部署依赖 Mac 和本机 Docker 保持运行；云端部署可在 Mac 关机后继续工作，QQ 登录失效仍需本人确认。

@@ -4,6 +4,7 @@ import argparse
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -13,6 +14,7 @@ import subprocess
 import tarfile
 import tempfile
 import time
+import urllib.request
 
 
 def execute(args, timeout=30, check=True):
@@ -36,8 +38,15 @@ class Operations:
             '-f',str(self.root/'current/compose.cloud.yaml'),*args])
 
     def container(self, service):
-        cid = self.compose('ps','--all','-q',service).stdout.strip()
-        if not cid:return None
+        # Compose ps --all can include `compose run` acceptance/admin jobs.
+        # Only the resident service belongs to the recovery policy.
+        ids = self.run(['docker','ps','--all','--quiet',
+            '--filter','label=com.docker.compose.project=qqbot-cloud',
+            '--filter',f'label=com.docker.compose.service={service}',
+            '--filter','label=com.docker.compose.oneoff=False']).stdout.split()
+        if not ids:return None
+        if len(ids)!=1:raise RuntimeError('Ambiguous resident service')
+        cid=ids[0]
         # State contains no container environment or authentication secrets.
         return json.loads(self.run(['docker','inspect','--format','{{json .State}}',cid]).stdout)
 
@@ -53,9 +62,49 @@ class Operations:
                 result['application']=json.loads(self.compose('exec','-T','bot','python','-m','qqbot.health','--status').stdout)
             except (ValueError,RuntimeError,subprocess.TimeoutExpired):
                 result['application']={'live':False,'ready':False,'reason':'probe_unavailable'}
+        if result['services']['napcat']['state']=='running' and not result.get('application',{}).get('ready'):
+            result['qq_login']=self.qq_login_status()
         disk=shutil.disk_usage(self.root)
         result['disk_used_percent']=round(100*(disk.total-disk.free)/disk.total,1)
         return result
+
+    def napcat_api(self):
+        config=json.loads((self.root/'data/napcat/webui.json').read_text())
+        token=config.get('token')
+        if not isinstance(token,str) or not token:raise RuntimeError('Private API unavailable')
+        opener=urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        def post(path,body,credential=None):
+            headers={'Content-Type':'application/json'}
+            if credential:headers['Authorization']='Bearer '+credential
+            req=urllib.request.Request('http://127.0.0.1:6099/api'+path,
+                json.dumps(body).encode(),headers=headers)
+            with opener.open(req,timeout=3) as response:value=json.load(response)
+            if not isinstance(value,dict) or value.get('code')!=0:raise ValueError('Private API unavailable')
+            return value['data']
+        auth=post('/auth/login',{'hash':hashlib.sha256((token+'.napcat').encode()).hexdigest()})
+        return lambda path,body=None:post(path,body or {},auth['Credential'])
+
+    def qq_login_status(self):
+        """OneBot can disappear on logout; consult the private WebUI separately."""
+        try:
+            value=self.napcat_api()('/QQLogin/CheckLoginStatus')
+            if not isinstance(value,dict):raise ValueError('Private API unavailable')
+            phase=value.get('loginPhase')
+            if phase not in ('ready','waiting_qrcode','qrcode_scanned','initializing','reconnecting'):
+                phase='unknown'
+            return dict(available=True,phase=phase,online=value.get('isLogin') is True,
+                        offline=value.get('isOffline') is True)
+        except (OSError,ValueError,KeyError,TypeError,RuntimeError):
+            return dict(available=False)
+
+    def configure_login(self):
+        api=self.napcat_api()
+        if api('/QQLogin/CheckLoginStatus').get('isLogin') is not True:
+            raise RuntimeError('Confirm QQ login before enabling quick login')
+        account=str(api('/QQLogin/GetQQLoginInfo').get('uin',''))
+        if not account.isdigit():raise RuntimeError('QQ account unavailable')
+        api('/QQLogin/SetQuickLoginQQ',{'uin':account})
+        return dict(quick_login_configured=True)
 
     def watchdog(self):
         status = self.status()
@@ -74,7 +123,8 @@ class Operations:
                 actions.append('restart_'+name)
         # An expired QQ login is an operator action, never a restart loop.
         reason=status.get('application',{}).get('reason')
-        if reason=='qq_login_required':actions.append('qq_scan_required')
+        if reason=='qq_login_required' or status.get('qq_login',{}).get('phase')=='waiting_qrcode':
+            actions.append('qq_scan_required')
         if status['disk_used_percent']>=85:actions.append('disk_space_low')
         atomic_json(path,saved)
         return dict(action=actions or ['none'],**status)
@@ -138,13 +188,13 @@ def atomic_json(path,value):
 
 def main():
     parser=argparse.ArgumentParser()
-    parser.add_argument('command',choices=['status','watchdog','backup','stop','start'])
+    parser.add_argument('command',choices=['status','watchdog','backup','stop','start','configure-login'])
     parser.add_argument('--root',default='/opt/qqbot')
     args=parser.parse_args()
     ops=Operations(args.root)
     try:
         with lock(ops.state/'operations.lock'):
-            print(json.dumps(getattr(ops,args.command)(),ensure_ascii=False))
+            print(json.dumps(getattr(ops,args.command.replace('-','_'))(),ensure_ascii=False))
     except (OSError,ValueError,RuntimeError,subprocess.SubprocessError) as exc:
         print(json.dumps(dict(error=type(exc).__name__,operation=args.command,detail='Check service status locally; credentials omitted')))
         raise SystemExit(1)

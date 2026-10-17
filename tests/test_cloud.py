@@ -9,6 +9,7 @@ import tempfile
 import time
 from types import SimpleNamespace as NS
 import unittest
+from unittest.mock import Mock
 
 from qqbot.health import RuntimeHealth, probe
 
@@ -70,6 +71,38 @@ class CloudTests(unittest.TestCase):
             application={'reason':'qq_login_required'},disk_used_percent=20)
         for _ in range(8):
             self.assertEqual(operation.watchdog()['action'],['qq_scan_required'])
+
+    def test_acceptance_job_is_excluded_from_resident_container_probe(self):
+        def runner(args):
+            if args[:2]==['docker','ps']:
+                ids='resident' if 'label=com.docker.compose.oneoff=False' in args else 'resident\nacceptance'
+                return NS(stdout=ids)
+            self.assertEqual(args[-1],'resident')
+            return NS(stdout=json.dumps({'Status':'running'}))
+        operation=ops.Operations(self.root,run=runner)
+        self.assertEqual(operation.container('bot')['Status'],'running')
+
+    def test_missing_onebot_with_qr_wait_is_reported_without_restart(self):
+        operation=ops.Operations(self.root,run=lambda _:self.fail('Unexpected Docker mutation'))
+        operation.status=lambda:dict(maintenance=False,services={
+            'bot':{'state':'running','health':'healthy'},'napcat':{'state':'running'}},
+            application={'reason':'qq_connection_pending'},
+            qq_login={'available':True,'phase':'waiting_qrcode','online':False},disk_used_percent=20)
+        self.assertEqual(operation.watchdog()['action'],['qq_scan_required'])
+
+    def test_quick_login_uses_only_the_current_authenticated_account(self):
+        operation=ops.Operations(self.root)
+        api=Mock(side_effect=[{'isLogin':True},{'uin':'456'},None])
+        operation.napcat_api=lambda:api
+        self.assertEqual(operation.configure_login(),{'quick_login_configured':True})
+        api.assert_called_with('/QQLogin/SetQuickLoginQQ',{'uin':'456'})
+
+    def test_quick_login_cannot_bind_an_unconfirmed_account(self):
+        operation=ops.Operations(self.root)
+        api=Mock(return_value={'isLogin':False})
+        operation.napcat_api=lambda:api
+        with self.assertRaises(RuntimeError):operation.configure_login()
+        api.assert_called_once_with('/QQLogin/CheckLoginStatus')
 
     def test_backup_restores_committed_wal_data_and_keeps_secrets_private(self):
         (self.root/'data/bot').mkdir(parents=True)

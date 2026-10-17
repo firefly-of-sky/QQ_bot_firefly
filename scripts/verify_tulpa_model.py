@@ -33,7 +33,8 @@ class TrackedLLM(LLM):
 
 
 async def main():
-    load_env_file('.env')
+    if Path('.env').is_file():
+        load_env_file('.env')
     original = load()
     remote = NapCatFixture()
     server=web.Application();server.router.add_get('/ws',remote.ws)

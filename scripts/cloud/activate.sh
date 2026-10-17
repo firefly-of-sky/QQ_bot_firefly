@@ -8,6 +8,11 @@ test "$(id -u)" = 0
 test -f "$root/.env"
 test -f "$release/release.env"
 test -f "$release/compose.cloud.yaml"
+# Bind-mounted configuration must be readable by the unprivileged container.
+chown root:10001 "$root/config.toml" "$root/tulpa.toml"
+chmod 0640 "$root/config.toml" "$root/tulpa.toml"
+chgrp -R 10001 "$root/personas"
+chmod -R g+rX,o-rwx "$root/personas"
 exec 9>"$root/run/operations.lock"
 flock -n 9
 compose() {

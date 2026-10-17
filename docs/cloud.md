@@ -26,6 +26,8 @@
 
 在服务器上用 root 执行源码中的 `scripts/cloud/install-host.sh`。镜像必须与服务器架构匹配：Mac 的 ARM 镜像不能直接当作 x86 镜像部署。可在本机使用 `docker buildx build --platform linux/amd64 --load -t qqbot-bot:4.0.0 .`，随后 `docker save`、上传并 `docker load`；也可在服务器构建。
 
+若服务器无法访问 Docker 下载站，可按阿里云官方镜像文档设置 `DOCKER_APT_REPO=https://mirrors.aliyun.com/docker-ce/linux/ubuntu` 后执行安装脚本。软件源仍验证签名。激活脚本给只读配置设置 `root:10001` 和 `0640`，让容器中的非 root 用户可以读取配置；`.env` 保持宿主 root 私有。
+
 每个发布目录放置 `release.env`，只写两个已加载的镜像引用，例如：
 
 ```dotenv
@@ -54,6 +56,8 @@ ssh -N -L 6099:127.0.0.1:6099 <服务器SSH配置>
 
 登录失效时需要本人使用机器人手机 QQ 扫码。进程自动恢复不能绕过 QQ 风控、模型账户余额、云服务器欠费或网络中断。
 
+首次扫码成功后执行 `python3 /opt/qqbot/current/scripts/cloud/ops.py configure-login`，将当前已验证账号设为 NapCat 快捷登录账号。它使用已有登录资料，不收集 QQ 密码。QQ 如返回“登录需要手Q验证”，仍需手机确认或重新扫码；快捷登录不是保证凭据始终有效的机制。
+
 ```bash
 python3 /opt/qqbot/current/scripts/cloud/ops.py status
 python3 /opt/qqbot/current/scripts/cloud/ops.py backup
@@ -65,9 +69,13 @@ journalctl -u qqbot-watchdog.service -n 20
 
 状态输出不包含密钥、QQ 号码、聊天原文或二维码。`ready=true` 表示 QQ 已在线、框架接收器连通、当前会话工作进程正常；不代表模型服务一定可用，仍需真实消息验证。健康检查 `/health/live` 只判断进程响应；`/health/ready` 判断连接是否就绪。端点只监听容器内回环地址。
 
+在已经配置专用 SSH 的这台 Mac 上，进入项目目录后可用 `bash scripts/cloud/remote.sh status` 查看云端状态，`backup` 手动备份，`configure-login` 设置当前账号快捷续登，`webui` 建立本机 16099 管理隧道。隧道关闭只影响管理页，不影响云端机器人。SSH 配置与专用私钥在本机 `.deployment/`，不进入 Git；更换电脑需要另外授权新的管理公钥。
+
 ## 自动恢复与备份范围
 
 Docker `unless-stopped` 处理进程退出和宿主重启；systemd 每分钟检查一次，连续 3 次发现 bot 不健康或容器缺失才恢复，两次恢复至少间隔 5 分钟。QQ 登录失效只报告 `qq_scan_required`。失败会话每 30 秒重试，其他好友的会话保持独立。
+
+常驻容器检查排除 `compose run` 的一次性管理/验收任务。OneBot 断开时，宿主通过回环地址查询私有 NapCat WebUI 的登录阶段；若等待二维码，即使 OneBot 接口已经消失，也明确报告 `qq_scan_required`。该检查不会自动扫码或在登录失效时循环重启。
 
 每天 04:20（含随机延迟）生成私有备份，保留最近 7 份。SQLite 使用在线备份接口，包含已提交的 WAL 内容；多份数据库分别一致，不是跨数据库事务快照。归档包含模型密钥、人格、机器人数据及 NapCat 配置，文件权限 0600，应按密钥文件保管。QQ 设备登录目录不作在线复制，需要停机导出。备份在同一块云盘，不能应对云盘丢失；后续如需异地备份应另选存储位置。
 
