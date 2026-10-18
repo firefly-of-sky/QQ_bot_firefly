@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#3e5b43">
+  <meta name="description" content="每天20分钟，从第一次打开终端，到独立管理你的QQbot。白话课程、模拟终端和真实操作清单。">
+  <title>服务器小课 · 把 QQbot 掌握在自己手里</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script defer src="data.js"></script>
+  <script defer src="simulator.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#main">跳到正文</a>
+  <aside class="sidebar">
+    <a class="brand" href="#home"><span class="brand-icon">⌘</span><span>服务器小课<small>从零开始，自己来。</small></span></a>
+    <div class="side-label">你的学习空间</div>
+    <nav id="nav" aria-label="主导航"></nav>
+    <div class="side-label course-label">学习路线 <span>7 个小课</span></div>
+    <nav id="course-nav" aria-label="课程列表"></nav>
+    <div class="sidebar-bottom"><div class="seed">✳</div><p>不必一下子懂全部。<br>今天学会一件事就很好。</p><small>为你的 Mac · Ubuntu · QQbot 设计</small></div>
+  </aside>
+  <div class="workspace">
+    <header class="topbar"><span id="breadcrumb">学习空间 / 概览</span><div><span class="saved-dot"></span><span id="save-status" role="status">进度保存在此浏览器</span></div></header>
+    <main id="main" tabindex="-1"></main>
+    <footer>服务器小课 <span>·</span> 按 QQbot 4.0 项目文档编写 <span>·</span> <a href="#sources">内容依据与使用说明</a></footer>
+  </div>
+  <div id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
