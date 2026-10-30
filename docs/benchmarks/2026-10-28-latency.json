@@ -1,0 +1,1090 @@
+{
+  "test_date": "2026-10-28",
+  "timezone": "Asia/Shanghai",
+  "model": "qwen3.8-flash",
+  "environment": "Aliyun ECS Ubuntu 22.04 amd64; real Tulpa and model, synthetic QQ",
+  "production_modified": false,
+  "settings": {
+    "message_merge_seconds": 1.2,
+    "message_merge_max_seconds": 4.0,
+    "max_output_tokens": 2048,
+    "thinking": "provider default; unchanged"
+  },
+  "order": [
+    "baseline-1",
+    "context-1",
+    "bubble-1",
+    "both-1",
+    "both-2",
+    "bubble-2",
+    "context-2",
+    "baseline-2"
+  ],
+  "scoring_note": "All original runs passed a keyword rubric; the final rubric additionally rejects weekday-trip contradictions and requires the update point. Existing answers were rescored without rerunning or selecting samples.",
+  "summary": {
+    "baseline": {
+      "samples": 10,
+      "passed": 10,
+      "first_reply_median_s": 10.216,
+      "complete_median_s": 10.657,
+      "complete_range_s": [
+        9.619,
+        17.76
+      ],
+      "first_prompt_median_bytes": 26424.5,
+      "model_calls": 25
+    },
+    "context": {
+      "samples": 10,
+      "passed": 9,
+      "first_reply_median_s": 9.565,
+      "complete_median_s": 9.95,
+      "complete_range_s": [
+        6.278,
+        12.792
+      ],
+      "first_prompt_median_bytes": 21720.0,
+      "model_calls": 22
+    },
+    "bubble": {
+      "samples": 10,
+      "passed": 10,
+      "first_reply_median_s": 10.669,
+      "complete_median_s": 12.057,
+      "complete_range_s": [
+        8.091,
+        17.511
+      ],
+      "first_prompt_median_bytes": 26423.5,
+      "model_calls": 24
+    },
+    "both": {
+      "samples": 10,
+      "passed": 10,
+      "first_reply_median_s": 11.497,
+      "complete_median_s": 11.943,
+      "complete_range_s": [
+        8.335,
+        21.47
+      ],
+      "first_prompt_median_bytes": 21720.0,
+      "model_calls": 22
+    }
+  },
+  "replay_summary": {
+    "baseline": {
+      "samples": 2,
+      "passed": 2,
+      "first_reply_median_s": 1.715,
+      "complete_median_s": 5.635,
+      "reply_counts": [
+        2,
+        2
+      ]
+    },
+    "bubble": {
+      "samples": 2,
+      "passed": 2,
+      "first_reply_median_s": 1.688,
+      "complete_median_s": 1.782,
+      "reply_counts": [
+        1,
+        1
+      ]
+    }
+  },
+  "results": [
+    {
+      "variant": "baseline",
+      "repetition": 1,
+      "case": "memory",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 10.512,
+      "complete_s": 10.663,
+      "reply_count": 1,
+      "model_calls": 2,
+      "model_seconds": 7.818,
+      "first_prompt_bytes": 26429,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "周末去近郊徒步或骑行一天，交通+餐费控制在预算上限1800元以内；提前查餐馆菜单，不吃花生，随身备零食；仅周末出行，避开工作日。口令：海棠642。"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "baseline",
+      "repetition": 1,
+      "case": "correction",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 15.494,
+      "complete_s": 15.609,
+      "reply_count": 1,
+      "model_calls": 3,
+      "model_seconds": 12.927,
+      "first_prompt_bytes": 26518,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "827"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "baseline",
+      "repetition": 1,
+      "case": "reference",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 17.424,
+      "complete_s": 17.76,
+      "reply_count": 1,
+      "model_calls": 4,
+      "model_seconds": 14.166,
+      "first_prompt_bytes": 26424,
+      "tools": [
+        "calculate",
+        "plan_chat_reply",
+        "send_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "7"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "baseline",
+      "repetition": 1,
+      "case": "short_points",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 10.127,
+      "complete_s": 10.226,
+      "reply_count": 1,
+      "model_calls": 2,
+      "model_seconds": 7.836,
+      "first_prompt_bytes": 26386,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "两点说明：\n\n1. 管理页只允许本机访问，不对外网开放。\n2. 更新前务必先备份，确保出问题时能回退。"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "baseline",
+      "repetition": 1,
+      "case": "explicit_split",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 8.836,
+      "complete_s": 10.651,
+      "reply_count": 2,
+      "model_calls": 2,
+      "model_seconds": 6.136,
+      "first_prompt_bytes": 26365,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "松",
+        "岚"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "baseline",
+      "repetition": 2,
+      "case": "memory",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 10.305,
+      "complete_s": 10.352,
+      "reply_count": 1,
+      "model_calls": 2,
+      "model_seconds": 8.578,
+      "first_prompt_bytes": 26428,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "建议安排一次周边周末短途游：预算上限1800元，点餐和零食全程避开花生及花生制品，出行时间只选周六或周日。口令：海棠642"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "baseline",
+      "repetition": 2,
+      "case": "correction",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 10.106,
+      "complete_s": 10.162,
+      "reply_count": 1,
+      "model_calls": 3,
+      "model_seconds": 7.977,
+      "first_prompt_bytes": 26523,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "827"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "baseline",
+      "repetition": 2,
+      "case": "reference",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 12.432,
+      "complete_s": 12.495,
+      "reply_count": 1,
+      "model_calls": 3,
+      "model_seconds": 10.812,
+      "first_prompt_bytes": 26425,
+      "tools": [
+        "calculate",
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "7"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "baseline",
+      "repetition": 2,
+      "case": "short_points",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 9.569,
+      "complete_s": 9.619,
+      "reply_count": 1,
+      "model_calls": 2,
+      "model_seconds": 7.995,
+      "first_prompt_bytes": 26390,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "1. 管理页仅限本机访问，外部网络无法打开；2. 更新前先备份当前配置和数据，以防异常回滚。"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "baseline",
+      "repetition": 2,
+      "case": "explicit_split",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 9.438,
+      "complete_s": 10.887,
+      "reply_count": 2,
+      "model_calls": 2,
+      "model_seconds": 7.805,
+      "first_prompt_bytes": 26364,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "松",
+        "岚"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "both",
+      "repetition": 1,
+      "case": "memory",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 21.349,
+      "complete_s": 21.47,
+      "reply_count": 1,
+      "model_calls": 2,
+      "model_seconds": 18.133,
+      "first_prompt_bytes": 21734,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "按你之前的约束，建议这样安排：\n\n1. 时间：只选周末，来一次周六出发、周日下午回的短途，不占工作日。\n2. 预算：全程控制在1800元以内，交通+住宿+吃饭大头提前订好。\n3. 饮食：不吃花生，点餐和买零食避开花生及花生油制品，外食先问一句。\n   口令：海棠642。"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "both",
+      "repetition": 1,
+      "case": "correction",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 9.769,
+      "complete_s": 9.868,
+      "reply_count": 1,
+      "model_calls": 2,
+      "model_seconds": 7.323,
+      "first_prompt_bytes": 21552,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "827"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "both",
+      "repetition": 1,
+      "case": "reference",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 11.253,
+      "complete_s": 11.356,
+      "reply_count": 1,
+      "model_calls": 3,
+      "model_seconds": 8.17,
+      "first_prompt_bytes": 21735,
+      "tools": [
+        "calculate",
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "7"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "both",
+      "repetition": 1,
+      "case": "short_points",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 11.267,
+      "complete_s": 11.372,
+      "reply_count": 1,
+      "model_calls": 2,
+      "model_seconds": 8.622,
+      "first_prompt_bytes": 21720,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "两点：\n\n1. 管理页只允许本机访问。\n2. 更新之前先备份。"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "both",
+      "repetition": 1,
+      "case": "explicit_split",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 12.931,
+      "complete_s": 15.248,
+      "reply_count": 2,
+      "model_calls": 2,
+      "model_seconds": 7.099,
+      "first_prompt_bytes": 21720,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "松",
+        "岚"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "both",
+      "repetition": 2,
+      "case": "memory",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 11.726,
+      "complete_s": 11.813,
+      "reply_count": 1,
+      "model_calls": 2,
+      "model_seconds": 8.961,
+      "first_prompt_bytes": 21734,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "建议安排一次周末一日往返的短途出行：预算上限1800元，优先公共交通加一顿当地正餐，剩下的留给门票；饮食全程避开花生，点餐时主动确认，零食也别带花生制品；时间只定在周六或周日，不占工作日。口令：海棠642。"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "both",
+      "repetition": 2,
+      "case": "correction",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 8.198,
+      "complete_s": 8.335,
+      "reply_count": 1,
+      "model_calls": 2,
+      "model_seconds": 5.684,
+      "first_prompt_bytes": 21552,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "827"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "both",
+      "repetition": 2,
+      "case": "reference",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 11.994,
+      "complete_s": 12.149,
+      "reply_count": 1,
+      "model_calls": 3,
+      "model_seconds": 9.508,
+      "first_prompt_bytes": 21735,
+      "tools": [
+        "calculate",
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "7"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "both",
+      "repetition": 2,
+      "case": "short_points",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 11.932,
+      "complete_s": 12.073,
+      "reply_count": 1,
+      "model_calls": 2,
+      "model_seconds": 8.041,
+      "first_prompt_bytes": 21720,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "两点说明：\n\n1. 管理页只允许本机访问，其他设备或外部网络打不开。\n2. 更新之前一定先做备份，避免数据丢失。"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "both",
+      "repetition": 2,
+      "case": "explicit_split",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 10.01,
+      "complete_s": 12.313,
+      "reply_count": 2,
+      "model_calls": 2,
+      "model_seconds": 7.367,
+      "first_prompt_bytes": 21720,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "松",
+        "岚"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "bubble",
+      "repetition": 1,
+      "case": "memory",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 16.243,
+      "complete_s": 16.743,
+      "reply_count": 1,
+      "model_calls": 2,
+      "model_seconds": 13.84,
+      "first_prompt_bytes": 26428,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "周末短途游建议：预算上限1800元，选周边高铁可达的小城住一晚民宿，餐饮注意避开花生及花生制品（点菜时主动告知店家），出行时间锁定周六出发、周日返程。口令：海棠642"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "bubble",
+      "repetition": 1,
+      "case": "correction",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 10.998,
+      "complete_s": 11.101,
+      "reply_count": 1,
+      "model_calls": 2,
+      "model_seconds": 7.347,
+      "first_prompt_bytes": 26528,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "827"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "bubble",
+      "repetition": 1,
+      "case": "reference",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 9.894,
+      "complete_s": 10.045,
+      "reply_count": 1,
+      "model_calls": 3,
+      "model_seconds": 7.248,
+      "first_prompt_bytes": 26424,
+      "tools": [
+        "calculate",
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "7"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "bubble",
+      "repetition": 1,
+      "case": "short_points",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 13.159,
+      "complete_s": 13.339,
+      "reply_count": 1,
+      "model_calls": 2,
+      "model_seconds": 9.267,
+      "first_prompt_bytes": 26385,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "1. 管理页仅限本机访问，外部网络无法打开。\n2. 更新前务必先做备份，防止配置或数据丢失。"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "bubble",
+      "repetition": 1,
+      "case": "explicit_split",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 10.045,
+      "complete_s": 11.917,
+      "reply_count": 2,
+      "model_calls": 2,
+      "model_seconds": 7.76,
+      "first_prompt_bytes": 26366,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "松",
+        "岚"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "bubble",
+      "repetition": 2,
+      "case": "memory",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 12.465,
+      "complete_s": 12.781,
+      "reply_count": 1,
+      "model_calls": 2,
+      "model_seconds": 10.033,
+      "first_prompt_bytes": 26423,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "周末短途游建议：预算控制在1800元以内，选高铁2小时可达的小城，住一晚精品民宿约500-600，两天吃住行刚好卡线。饮食方面避开花生及花生油烹饪的菜品，点餐时提前跟店家说明过敏忌口。出行时间锁定周六早出发、周日晚返回。口令：海棠642"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "bubble",
+      "repetition": 2,
+      "case": "correction",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 8.002,
+      "complete_s": 8.091,
+      "reply_count": 1,
+      "model_calls": 2,
+      "model_seconds": 5.364,
+      "first_prompt_bytes": 26522,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "827"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "bubble",
+      "repetition": 2,
+      "case": "reference",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 17.315,
+      "complete_s": 17.511,
+      "reply_count": 1,
+      "model_calls": 5,
+      "model_seconds": 14.367,
+      "first_prompt_bytes": 26424,
+      "tools": [
+        "calculate",
+        "plan_chat_reply",
+        "send_chat_reply",
+        "send_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "7"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "bubble",
+      "repetition": 2,
+      "case": "short_points",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 10.032,
+      "complete_s": 10.165,
+      "reply_count": 1,
+      "model_calls": 2,
+      "model_seconds": 7.831,
+      "first_prompt_bytes": 26387,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "两点说明：1）管理页只允许本机访问，外部地址打不开；2）每次更新前请先备份，确认备份成功后再执行更新。"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "bubble",
+      "repetition": 2,
+      "case": "explicit_split",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 10.341,
+      "complete_s": 12.197,
+      "reply_count": 2,
+      "model_calls": 2,
+      "model_seconds": 7.848,
+      "first_prompt_bytes": 26362,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "松",
+        "岚"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "context",
+      "repetition": 1,
+      "case": "memory",
+      "passed": false,
+      "error": null,
+      "first_reply_s": 9.71,
+      "complete_s": 9.874,
+      "reply_count": 1,
+      "model_calls": 2,
+      "model_seconds": 7.332,
+      "first_prompt_bytes": 21734,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "简短建议：选周边高铁/大巴1-2小时可达的小城或自然景区，两天一晚，吃住交通总控在预算上限1800元以内；饮食限制避开花生，点餐时注意含花生油或花生酱的菜品；出行时间锁定周末，周五晚出发或周六早出发，周日晚返回。口令：海棠642"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true,
+      "quality_note": "Mentions weekend constraint but recommends Friday-evening departure; violates weekend-only requirement."
+    },
+    {
+      "variant": "context",
+      "repetition": 1,
+      "case": "correction",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 8.884,
+      "complete_s": 8.967,
+      "reply_count": 1,
+      "model_calls": 2,
+      "model_seconds": 6.567,
+      "first_prompt_bytes": 21552,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "827"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "context",
+      "repetition": 1,
+      "case": "reference",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 9.977,
+      "complete_s": 10.084,
+      "reply_count": 1,
+      "model_calls": 3,
+      "model_seconds": 7.277,
+      "first_prompt_bytes": 21735,
+      "tools": [
+        "calculate",
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "7"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "context",
+      "repetition": 1,
+      "case": "short_points",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 9.88,
+      "complete_s": 10.027,
+      "reply_count": 1,
+      "model_calls": 2,
+      "model_seconds": 7.405,
+      "first_prompt_bytes": 21720,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "两点说明：一、管理页只允许本机访问；二、更新之前先做备份。"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "context",
+      "repetition": 1,
+      "case": "explicit_split",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 9.419,
+      "complete_s": 11.323,
+      "reply_count": 2,
+      "model_calls": 2,
+      "model_seconds": 7.115,
+      "first_prompt_bytes": 21720,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "松",
+        "岚"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "context",
+      "repetition": 2,
+      "case": "memory",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 12.105,
+      "complete_s": 12.792,
+      "reply_count": 1,
+      "model_calls": 2,
+      "model_seconds": 8.911,
+      "first_prompt_bytes": 21734,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "建议安排一次周末两天一夜的短途游，交通+住宿+餐饮总花费控制在1800元以内。点餐提前说明不吃花生，坚果类零食也避开，随身带几包非花生的小食更稳妥。选周六早上出发、周日返程，市内或周边高铁1小时内的城市都合适。\n口令：海棠642"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "context",
+      "repetition": 2,
+      "case": "correction",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 6.224,
+      "complete_s": 6.278,
+      "reply_count": 1,
+      "model_calls": 2,
+      "model_seconds": 4.471,
+      "first_prompt_bytes": 21552,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "827"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "context",
+      "repetition": 2,
+      "case": "reference",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 8.397,
+      "complete_s": 8.449,
+      "reply_count": 1,
+      "model_calls": 3,
+      "model_seconds": 6.719,
+      "first_prompt_bytes": 21735,
+      "tools": [
+        "calculate",
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "7"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "context",
+      "repetition": 2,
+      "case": "short_points",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 11.782,
+      "complete_s": 11.878,
+      "reply_count": 1,
+      "model_calls": 2,
+      "model_seconds": 9.779,
+      "first_prompt_bytes": 21720,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "两点说明：\n\n1. 管理页只允许本机访问。\n2. 更新之前必须先备份。"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "context",
+      "repetition": 2,
+      "case": "explicit_split",
+      "passed": true,
+      "error": null,
+      "first_reply_s": 8.024,
+      "complete_s": 9.536,
+      "reply_count": 2,
+      "model_calls": 2,
+      "model_seconds": 6.349,
+      "first_prompt_bytes": 21720,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "松",
+        "岚"
+      ],
+      "real_model": true,
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "baseline",
+      "repetition": 1,
+      "case": "short_replay",
+      "real_model": false,
+      "passed": true,
+      "error": null,
+      "first_reply_s": 1.724,
+      "complete_s": 5.635,
+      "reply_count": 2,
+      "model_calls": 2,
+      "model_seconds": 0,
+      "first_prompt_bytes": 26070,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "管理页只允许本机访问，不要把6099端口开放到公网。若需管理，请通过专用SSH隧道访问本机地址，操作结束后关闭隧道即可，机器人仍会继续运行。",
+        "更新之前先备份，确认备份完成后再操作。"
+      ],
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "baseline",
+      "repetition": 2,
+      "case": "short_replay",
+      "real_model": false,
+      "passed": true,
+      "error": null,
+      "first_reply_s": 1.705,
+      "complete_s": 5.635,
+      "reply_count": 2,
+      "model_calls": 2,
+      "model_seconds": 0,
+      "first_prompt_bytes": 26072,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "管理页只允许本机访问，不要把6099端口开放到公网。若需管理，请通过专用SSH隧道访问本机地址，操作结束后关闭隧道即可，机器人仍会继续运行。",
+        "更新之前先备份，确认备份完成后再操作。"
+      ],
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "bubble",
+      "repetition": 1,
+      "case": "short_replay",
+      "real_model": false,
+      "passed": true,
+      "error": null,
+      "first_reply_s": 1.691,
+      "complete_s": 1.787,
+      "reply_count": 1,
+      "model_calls": 2,
+      "model_seconds": 0,
+      "first_prompt_bytes": 26070,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "管理页只允许本机访问，不要把6099端口开放到公网。若需管理，请通过专用SSH隧道访问本机地址，操作结束后关闭隧道即可，机器人仍会继续运行。\n更新之前先备份，确认备份完成后再操作。"
+      ],
+      "original_keyword_check_passed": true
+    },
+    {
+      "variant": "bubble",
+      "repetition": 2,
+      "case": "short_replay",
+      "real_model": false,
+      "passed": true,
+      "error": null,
+      "first_reply_s": 1.684,
+      "complete_s": 1.778,
+      "reply_count": 1,
+      "model_calls": 2,
+      "model_seconds": 0,
+      "first_prompt_bytes": 26067,
+      "tools": [
+        "plan_chat_reply",
+        "send_chat_reply"
+      ],
+      "answers": [
+        "管理页只允许本机访问，不要把6099端口开放到公网。若需管理，请通过专用SSH隧道访问本机地址，操作结束后关闭隧道即可，机器人仍会继续运行。\n更新之前先备份，确认备份完成后再操作。"
+      ],
+      "original_keyword_check_passed": true
+    }
+  ]
+}

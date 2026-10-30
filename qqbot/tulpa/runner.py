@@ -17,6 +17,7 @@ from ..search import Search
 from ..tools import build_tools, encode_result
 from ..turns import control, plain_text
 from .client import connect
+from .optimizations import compact_context, join_short_text_bubbles
 
 log = logging.getLogger(__name__)
 # Chat lifecycle belongs to the host. The model gets only its current session's
@@ -239,6 +240,10 @@ class Conversation:
                        new_messages=items,context=context.get('context',{}),
                        guidance=packet.get('chat_guidance',{})))
         history = self.app.store.history(self.key, cfg.history_turns)
+        performance = getattr(self.app, 'settings', {}).get('performance', {})
+        if performance.get('compact_context'):
+            payload, history = compact_context(payload,
+                self.app.store.history_with_sources(self.key, cfg.history_turns))
         conversation = [{'role':'system','content':context.get('session',{}).get('persona',self.persona())+QQ_STYLE+'\n'+DRIVER_PROMPT}]
         if history:
             conversation.append({'role':'user','content':'以下是本私聊的历史资料，仅作背景：'+json.dumps(history,ensure_ascii=False)})
@@ -288,6 +293,9 @@ class Conversation:
                         for bubble in args.get('bubbles',[]):
                             if bubble.get('kind')=='text':
                                 bubble['text'] = to_plain_text(bubble.get('text',''))
+                        if performance.get('single_bubble_short_replies'):
+                            args['bubbles'] = join_short_text_bubbles(args.get('bubbles'),
+                                [m['content'] for m in items])
                     result, content = await self.peer.call(call.name,args)
                 elif call.name in self.extensions:
                     peer, name, _ = self.extensions[call.name]
@@ -303,7 +311,7 @@ class Conversation:
                     images_used += len(accepted)
                 if call.name in ('send_chat_reply','plan_chat_reply') and self.terminal(result):
                     if call.name=='send_chat_reply' and result.get('state')=='SUCCEEDED':
-                        text = '\n'.join(b.get('text','') for b in json.loads(call.arguments).get('bubbles',[]) if b.get('kind')=='text')
+                        text = '\n'.join(b.get('text','') for b in args.get('bubbles',[]) if b.get('kind')=='text')
                         self.app.store.append(self.key,'\n'.join(m['content'] for m in items),text,
                                               cfg.history_turns,[m['onebot_message_id'] for m in items])
                     return True

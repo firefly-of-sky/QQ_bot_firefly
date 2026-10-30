@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qqbot-private"
-version = "4.0.0"
+version = "4.0.1"
 description = "Tulpa MCP powered resident QQ agent with isolated friend sessions"
 requires-python = ">=3.12"
 dependencies = [

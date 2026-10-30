@@ -25,6 +25,7 @@ class ModelFixture:
     def __init__(self):
         self.calls = 0
         self.gate = None
+        self.bubbles = None
 
     async def turn(self, model, messages, tools):
         self.calls += 1
@@ -34,7 +35,7 @@ class ModelFixture:
         plan = next((m for m in reversed(results) if m.get('state')=='READY'),None)
         if plan:
             return ModelReply(calls=(ToolCall('send','send_chat_reply',json.dumps(dict(
-                plan_id=plan['plan_id'],bubbles=[dict(kind='text',text='fixture answer')]))),))
+                plan_id=plan['plan_id'],bubbles=self.bubbles or [dict(kind='text',text='fixture answer')]))),))
         return ModelReply(calls=(ToolCall('plan','plan_chat_reply',json.dumps(dict(
             action='reply',expressions=['text'],intent='answer fixture'))),))
 
@@ -125,7 +126,7 @@ class TulpaIntegration(unittest.IsolatedAsyncioTestCase):
             extension_task=asyncio.create_task(extension_server.serve())
             await until(lambda:extension_server.started)
             settings_path=root/'tulpa.toml'
-            settings_path.write_text(f'[mcp_servers.fixture]\nurl="http://127.0.0.1:{extension_port}/mcp"\ntools=["nested_sum"]\n')
+            settings_path.write_text(f'[performance]\ncompact_context=true\nsingle_bubble_short_replies=true\n[mcp_servers.fixture]\nurl="http://127.0.0.1:{extension_port}/mcp"\ntools=["nested_sum"]\n')
             cfg = Config(owner=123,token='fixture-token',ws_url=f'ws://127.0.0.1:{port}/ws',
                 database=str(root/'chat.sqlite3'),models={'primary':Model('http://unused','fixture','UNUSED')},
                 default_model='primary',message_merge_seconds=.2,message_merge_max_seconds=1,
@@ -144,10 +145,14 @@ class TulpaIntegration(unittest.IsolatedAsyncioTestCase):
                         self.assertEqual(schema['function']['parameters']['properties']['items']['type'],'array')
                         nested, _ = await ext.call(name,{'items':[{'value':7},{'value':9}]})
                         self.assertEqual(nested['total'],16)
+                        model.bubbles=[dict(kind='text',text='fixture answer'),dict(kind='text',text='完整第二句')]
                         await remote.emit('first question')
                         await until(lambda:len(remote.sent)==1)
                         self.assertEqual(remote.sent[0]['user_id'],123)
-                        self.assertEqual(remote.sent[0]['message'][0]['data']['text'],'fixture answer')
+                        self.assertEqual(remote.sent[0]['message'][0]['data']['text'],'fixture answer\n完整第二句')
+                        await until(lambda:bool(app.store.history(first.key,20)))
+                        self.assertEqual(app.store.history(first.key,20)[-1][1],'fixture answer\n完整第二句')
+                        model.bubbles=None
                         # Same native message replay is deduplicated by Tulpa.
                         for ws in list(remote.clients):await ws.send_json(remote.history[str(remote.mid)])
                         await asyncio.sleep(.5);self.assertEqual(len(remote.sent),1)

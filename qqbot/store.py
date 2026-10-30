@@ -54,6 +54,13 @@ class Store:
     def history(self, session: str, limit: int) -> list[tuple[str, str]]:
         return list(reversed(self.db.execute("SELECT user, assistant FROM turns WHERE session=? ORDER BY id DESC LIMIT ?", (session, limit)).fetchall()))
 
+    def history_with_sources(self, session: str, limit: int) -> list[dict]:
+        rows = self.db.execute('SELECT id,user,assistant FROM turns WHERE session=? ORDER BY id DESC LIMIT ?',
+                               (session, limit)).fetchall()
+        return [dict(user=user, assistant=assistant, sources=[r[0] for r in self.db.execute(
+            'SELECT message_id FROM turn_sources WHERE turn_id=? AND session=?', (tid, session))])
+            for tid, user, assistant in reversed(rows)]
+
     def append(self, session: str, user: str, assistant: str, keep: int, sources=()):
         with self.db:
             result = self.db.execute("INSERT INTO turns(session,user,assistant) VALUES (?,?,?)", (session, user, assistant))
