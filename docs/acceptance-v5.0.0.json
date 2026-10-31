@@ -1,0 +1,55 @@
+{
+  "version": "5.0.0",
+  "implementation_commit": "e5fecdb",
+  "deployment_date": "2026-10-31",
+  "model": "deepseek-v4.1-flash-1017",
+  "image": "sha256:9afda7e77dcdb30b87167a3f9609561e4a448edc11630ff4538a08dc1de864fc",
+  "source_archive_sha256": "a173522b76364500bc28bef750e399c57c25ba24a9d32b9c698eba6cbb4854cf",
+  "wheel_sha256": "582d86faa6015188ffa8a83edf19f07c66435eeb6a3f234b32d1b0a67b6aff4a",
+  "backup": "qqbot-20261031T135734975034Z.tar.gz",
+  "configuration_snapshot": "before-v5-20261031T135735Z",
+  "release": "/opt/qqbot/releases/5.0.0-autonomy-candidate",
+  "previous_release": "/opt/qqbot/releases/4.0.0-baa65c0",
+  "regression": {
+    "mac_tests_passed": 163,
+    "final_amd64_tests_passed": 163,
+    "final_amd64_seconds": 58.295,
+    "isolated_route_diagnostic_tests_passed": 7,
+    "note": "One earlier full run timed out waiting for the second friend's first reply with an intentionally delayed extension. Isolated diagnosis and the subsequent complete final-image run passed; root cause was not established."
+  },
+  "real_model_synthetic_qq": {
+    "private_qzone_post": true,
+    "friend_directory": true,
+    "own_message_recall": true,
+    "ordinary_friend_account_write_denied": true,
+    "autonomous_friend_request": true,
+    "synthetic_request_decision": "approve"
+  },
+  "real_qq": {
+    "online": true,
+    "operator_ready": true,
+    "operator_categories": 8,
+    "friend_directory_read": true,
+    "friend_count": 3,
+    "group_directory_read": true,
+    "group_count": 0,
+    "profile_read": true,
+    "self_only_test_post_state": "SUCCEEDED",
+    "post_receipt_present": true,
+    "only_new_test_post_cleanup_state": "SUCCEEDED",
+    "napcat_restarted": false,
+    "history_turns_before_and_after": 33,
+    "model_preferences_before_and_after": 2,
+    "watchdog_timer_active": true,
+    "backup_timer_active": true,
+    "operator_credential_mode": "0600",
+    "operator_ledger_mode": "0600"
+  },
+  "limits": [
+    "54 of 63 typed category actions match the installed provider registry; registration is not live verification of every QQ operation.",
+    "No live group management test: the account currently belongs to no groups.",
+    "Friend approval was verified using an authentic-shaped isolated event, without accepting or rejecting a real person's request.",
+    "Actual-model reasoning and actual-QQ writes were tested separately. A fresh desktop-to-cloud conversational round was not executed because Mac QQ was on the BOF login screen.",
+    "Security, credentials and payment APIs are not exposed; QQ login expiry still requires the account owner's confirmation."
+  ]
+}
