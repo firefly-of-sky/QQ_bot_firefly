@@ -10,7 +10,9 @@ log = logging.getLogger(__name__)
 
 
 class DeliveryError(Exception):
-    pass
+    def __init__(self,message,*,retcode=None,rejected=False):
+        super().__init__(message)
+        self.retcode,self.rejected=retcode,rejected
 
 
 class OneBot:
@@ -60,7 +62,7 @@ class OneBot:
             await ws.send_json({"action": action, "params": params, "echo": echo})
             response = await asyncio.wait_for(future, timeout=15)
             if response.get("status") != "ok" or response.get("retcode") != 0:
-                raise DeliveryError("QQ rejected action")
+                raise DeliveryError("QQ rejected action",retcode=response.get('retcode'),rejected=True)
             return response.get("data")
         except (aiohttp.ClientError, OSError, TimeoutError) as exc:
             raise DeliveryError("QQ delivery failed or unconfirmed") from exc

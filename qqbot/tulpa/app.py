@@ -35,6 +35,8 @@ class Application:
         self.tasks = []
         self.health = RuntimeHealth(self)
         self.recovery_at = {}
+        self.operator = None
+        self.operator_error = None
 
     async def directory(self):
         login = await self.transport.action('get_login_info',{})
@@ -88,6 +90,7 @@ class Application:
         self.conversations.pop(conversation.cid,None)
 
     async def event(self, event):
+        if getattr(self,'operator',None):self.operator.receive(event)
         if event.get('post_type')=='notice' and event.get('notice_type')=='friend_recall':
             cid = f"{event.get('self_id')}:direct:{event.get('user_id')}"
             conversation = self.conversations.get(cid)
@@ -159,6 +162,16 @@ class Application:
                           max_collect_seconds=self.cfg.message_merge_max_seconds)
             (root/'data/mcp-chat-policy.json').write_text(json.dumps(policy))
             await self.backend.start()
+            if self.settings.get('autonomy',{}).get('enabled'):
+                try:
+                    from .operator import QQOperator
+                    grant=await self.backend.operator_grant(self.settings['autonomy'],f'{self.account}:direct:{self.cfg.owner}')
+                    operator=QQOperator(self,grant)
+                    await operator.start()
+                    self.operator=operator
+                except Exception as exc:
+                    self.operator_error=type(exc).__name__
+                    log.warning('QQ operator unavailable (%s)',self.operator_error)
             self.relay.on_event = self.event
             # Attach/resume every persisted active session, bounded by Tulpa's
             # own eight-session limit. No pre-session messages are fabricated.
@@ -184,6 +197,7 @@ class Application:
             await asyncio.gather(*self.tasks)
         finally:
             self.health.stage = 'stopping'
+            if self.operator:await self.operator.close()
             for c in list(self.conversations.values()):
                 c.task.cancel()
             await asyncio.gather(*(c.task for c in self.conversations.values()),return_exceptions=True)

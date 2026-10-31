@@ -71,6 +71,27 @@ class Backend:
     def url(self):
         return self.service.status()['url']
 
+    async def operator_grant(self, policy, owner_cid):
+        """Enroll explicit host consent; never heal a revoked/reduced grant."""
+        if not policy['enabled']:return None
+        approved_flags={'chat_voice','chat_video','chat_files','qq_messages','qq_interactions',
+                        'qq_friends','qq_profile','qq_qzone','qq_albums'}
+        path=self.root/'operator-connection.json'
+        saved=json.loads(path.read_text()) if path.exists() else None
+        normal=await self.grant(owner_cid)
+        if saved:await asyncio.to_thread(self.access.authorize,saved['token'],source=False)
+        if not saved or saved.get('authorization_id')!=policy['authorization_id']:
+            await asyncio.to_thread(self.access.update_permissions,normal['id'],dict(
+                chat_sticker_send=True,chat_voice=True,chat_video=True,chat_files=True,
+                qq_messages=True,qq_interactions=True))
+            permissions=dict(send=True,chat=True,onebot=True,manage=True,chat_images=True,
+                chat_sticker_send=True,chat_sticker_collect=True,**{k:True for k in approved_flags})
+            if saved:await asyncio.to_thread(self.access.update_permissions,saved['id'],permissions)
+            else:saved=await asyncio.to_thread(self.access.create,dict(name='QQbot owner operator',
+                platforms=['qq'],all_conversations=True,**permissions))
+            saved['authorization_id']=policy['authorization_id'];secret_json(path,saved)
+        return saved
+
     async def close(self):
         if hasattr(self,'admin'):
             self.admin.should_exit = True

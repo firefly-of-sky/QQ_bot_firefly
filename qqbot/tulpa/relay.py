@@ -89,9 +89,15 @@ class Relay:
             params = await request.json()
             if not isinstance(params, dict):
                 raise web.HTTPBadRequest()
-            result = await self.transport.action(request.match_info['action'], params)
+            # Native Tulpa and NapCat use different names for this one action.
+            action={'delete_group_file_folder':'delete_group_folder'}.get(
+                request.match_info['action'],request.match_info['action'])
+            result = await self.transport.action(action, params)
             return web.json_response(dict(status='ok', retcode=0, data=result))
-        except DeliveryError:
+        except DeliveryError as exc:
+            if exc.rejected:
+                return web.json_response(dict(status='failed',retcode=exc.retcode if type(exc.retcode) is int else -1,
+                                              data=None,message='QQ rejected action'))
             # Ambiguous send results must reach Tulpa as transport uncertainty,
             # never as a clean rejection that might invite a second write.
             raise web.HTTPServiceUnavailable(text='OneBot source unavailable') from None

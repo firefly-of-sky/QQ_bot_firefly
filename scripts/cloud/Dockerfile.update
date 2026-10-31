@@ -1,0 +1,16 @@
+# Build on an already verified runtime image when the runtime requirements did
+# not change. deployment-wheel/ must contain only this release's pure Python wheel.
+ARG QQBOT_BASE_IMAGE
+FROM ${QQBOT_BASE_IMAGE}
+USER root
+WORKDIR /app
+COPY deployment-wheel/ /tmp/qqbot-wheel/
+RUN pip install --no-index --no-deps /tmp/qqbot-wheel/*.whl \
+    && rm -rf /tmp/qqbot-wheel
+COPY qqbot /app/qqbot
+COPY vendor/tulpa /app/vendor/tulpa
+COPY pyproject.toml /app/pyproject.toml
+COPY tulpa.example.toml /app/tulpa.toml
+RUN python -m compileall -q /app/qqbot
+USER bot
+CMD ["python", "-m", "qqbot"]

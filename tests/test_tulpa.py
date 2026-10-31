@@ -60,11 +60,18 @@ class NapCatFixture:
                 if name=='get_login_info': data={'user_id':456,'nickname':'robot'}
                 elif name=='get_status': data={'online':self.online,'good':self.online}
                 elif name=='get_friend_list': data=[{'user_id':u,'nickname':'friend'+str(u),'remark':''} for u in (123,124)]
-                elif name=='get_group_list': data=[]
+                elif name=='get_group_list': data=getattr(self,'groups',[])
                 elif name=='get_msg': data=self.history.get(str(args['message_id']))
                 elif name=='send_private_msg':
                     self.sent.append(args)
                     data={'message_id':1000+len(self.sent)}
+                    self.history[str(data['message_id'])]=dict(message_id=data['message_id'],self_id=456,
+                        user_id=456,target_id=args['user_id'],sender={'user_id':456},
+                        message_type='private',sub_type='friend',time=int(time.time()),message=args['message'])
+                elif hasattr(self,'extra_action'):
+                    try:data=self.extra_action(name,args)
+                    except KeyError:
+                        await ws.send_json(dict(echo=call['echo'],status='failed',retcode=1404,data=None));continue
                 else:
                     await ws.send_json(dict(echo=call['echo'],status='failed',retcode=1404,data=None));continue
                 await ws.send_json(dict(echo=call['echo'],status='ok',retcode=0,data=data))

@@ -31,7 +31,12 @@ class RuntimeHealth:
         failed = sum(bool(c.error or (c.task and c.task.done())) for c in conversations)
         ready_workers = sum(bool(c.ready.is_set() and not c.error and c.task and not c.task.done()) for c in conversations)
         live = time.monotonic()-self.pulse < 30 and self.stage != 'stopping'
+        operator_enabled=getattr(app,'settings',{}).get('autonomy',{}).get('enabled',False)
+        operator=getattr(app,'operator',None)
+        operator_ready=bool(operator and (operator.store.paused or not
+            (operator.background_task and operator.background_task.done())))
         ready = live and connected and app.transport.online is True and mcp and receiver == 'connected' and not failed
+        ready=ready and (not operator_enabled or operator_ready)
         if not live:
             reason = 'process_unresponsive'
         elif app.transport.online is False:
@@ -42,6 +47,8 @@ class RuntimeHealth:
             reason = 'framework_connection_pending'
         elif failed:
             reason = 'conversation_recovering'
+        elif operator_enabled and not operator_ready:
+            reason = 'qq_operator_unavailable'
         else:
             reason = 'ready'
         return dict(version=__version__, live=live, ready=ready, reason=reason,
@@ -49,6 +56,8 @@ class RuntimeHealth:
                     qq_connected=connected, qq_online=app.transport.online,
                     mcp_running=mcp, receiver=receiver,
                     conversations=dict(total=len(conversations), ready=ready_workers, failed=failed),
+                    qq_autonomy=dict(enabled=operator_enabled,ready=operator_ready,
+                                     paused=operator.store.paused if operator else False),
                     relay_dropped_events=app.relay.losses)
 
     async def start(self):

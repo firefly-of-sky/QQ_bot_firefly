@@ -9,7 +9,7 @@ from urllib.parse import urlsplit
 def load_settings():
     path = Path(os.environ.get('TULPA_CONFIG', 'tulpa.toml'))
     result = tomllib.loads(path.read_text()) if path.exists() else {}
-    if set(result)-{'conversations', 'mcp_servers', 'performance'}:
+    if set(result)-{'conversations', 'mcp_servers', 'performance', 'autonomy'}:
         raise ValueError('Unknown Tulpa application setting')
     conversations = result.get('conversations', {})
     if set(conversations)-{'friends', 'max_sessions', 'idle_seconds'}:
@@ -27,6 +27,17 @@ def load_settings():
     if (not isinstance(performance, dict) or set(performance)-flags
             or any(type(value) is not bool for value in performance.values())):
         raise ValueError('Performance settings must be known boolean flags')
+    autonomy=result.get('autonomy',{})
+    if (not isinstance(autonomy,dict) or set(autonomy)-{'enabled','authorization_id','capabilities_file','background_friend_requests','writes_per_minute','background_per_hour'}
+            or any(type(autonomy.get(k,False)) is not bool for k in ('enabled','background_friend_requests'))):
+        raise ValueError('Invalid autonomy settings')
+    authorization=autonomy.get('authorization_id','')
+    if not isinstance(authorization,str) or (autonomy.get('enabled') and not re.fullmatch(r'[a-zA-Z0-9_-]{8,80}',authorization)):
+        raise ValueError('Enabling autonomy requires an explicit authorization_id')
+    if not isinstance(autonomy.get('capabilities_file',''),str):raise ValueError('Invalid capabilities manifest')
+    for key,default,maximum in [('writes_per_minute',10,60),('background_per_hour',12,120)]:
+        value=autonomy.get(key,default)
+        if type(value) is not int or not 1<=value<=maximum:raise ValueError('Invalid autonomy rate limit')
     servers = result.get('mcp_servers', {})
     for name, server in servers.items():
         if not re.fullmatch('[a-z][a-z0-9_]{0,15}', name):
@@ -44,4 +55,9 @@ def load_settings():
             raise ValueError('MCP tools must be a list')
     return dict(friends=conversations.get('friends','all'), max_sessions=max_sessions,
                 idle_seconds=idle, mcp_servers=servers,
-                performance={name: performance.get(name, False) for name in flags})
+                performance={name: performance.get(name, False) for name in flags},
+                autonomy=dict(enabled=autonomy.get('enabled',False),authorization_id=authorization,
+                    capabilities_file=autonomy.get('capabilities_file',''),
+                    background_friend_requests=autonomy.get('background_friend_requests',False),
+                    writes_per_minute=autonomy.get('writes_per_minute',10),
+                    background_per_hour=autonomy.get('background_per_hour',12)))

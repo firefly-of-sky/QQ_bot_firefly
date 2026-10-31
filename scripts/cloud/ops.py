@@ -125,6 +125,7 @@ class Operations:
         reason=status.get('application',{}).get('reason')
         if reason=='qq_login_required' or status.get('qq_login',{}).get('phase')=='waiting_qrcode':
             actions.append('qq_scan_required')
+        if reason=='qq_operator_unavailable':actions.append('qq_operator_unavailable')
         if status['disk_used_percent']>=85:actions.append('disk_space_low')
         atomic_json(path,saved)
         return dict(action=actions or ['none'],**status)
