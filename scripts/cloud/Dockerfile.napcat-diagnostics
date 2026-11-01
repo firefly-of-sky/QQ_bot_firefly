@@ -1,0 +1,12 @@
+# Build context: the checksum-verified diagnostic napcat-diagnostic.mjs.
+# The base is verified by image ID before invoking this Dockerfile.
+ARG NAPCAT_BASE_IMAGE=qqbot-napcat:4.0.0-amd64
+FROM ${NAPCAT_BASE_IMAGE}
+# The base entrypoint skips extraction when napcat.mjs already exists.
+# Preserve the complete distribution (native modules, schemas and WebUI).
+RUN mkdir -p /app/napcat /tmp/qqbot-napcat-dist \
+    && unzip -qo /app/NapCat.Shell.zip -d /tmp/qqbot-napcat-dist \
+    && cp -a /tmp/qqbot-napcat-dist/. /app/napcat/ \
+    && rm -rf /tmp/qqbot-napcat-dist
+COPY napcat-diagnostic.mjs /app/napcat/napcat.mjs
+RUN python3 -c 'from pathlib import Path; import hashlib; p=Path("/app/napcat"); assert (p/"native").is_dir() and (p/"static").is_dir(); assert hashlib.sha256((p/"napcat.mjs").read_bytes()).hexdigest()=="00babe43a5de5ce64f917e7ebc085fbae06f6e86fddf243e6e4e885fbd6b7b87"'

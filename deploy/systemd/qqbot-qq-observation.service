@@ -1,0 +1,12 @@
+[Unit]
+Description=Optional bounded QQ-without-Bot diagnosis
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/qqbot
+ExecStart=/usr/bin/python3 /opt/qqbot/current/scripts/cloud/observe_qq.py --duration 9600
+ExecStopPost=/usr/bin/python3 /opt/qqbot/current/scripts/cloud/observe_qq.py --resume
+TimeoutStartSec=10860
+TimeoutStopSec=90

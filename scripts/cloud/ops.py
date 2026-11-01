@@ -112,6 +112,11 @@ class Operations:
         path=self.state/'watchdog.json'
         saved=json.loads(path.read_text()) if path.exists() else {}
         actions=[]
+        if (self.state/'qq-diagnostics.enabled').exists():
+            try:
+                if self.observe_qq(status,saved):actions.append('qq_incident_captured')
+            except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
+                actions.append('qq_incident_capture_failed')
         for name,state in status['services'].items():
             bad=state['state'] in ('missing','exited','dead') or (name=='bot' and state.get('health')=='unhealthy')
             item=saved.setdefault(name,{'strikes':0,'last_restart':0})
@@ -129,6 +134,52 @@ class Operations:
         if status['disk_used_percent']>=85:actions.append('disk_space_low')
         atomic_json(path,saved)
         return dict(action=actions or ['none'],**status)
+
+    def diagnose(self, status=None):
+        """Private bounded snapshot. No QR refresh, restart or credential changes."""
+        status=self.status() if status is None else status
+        folder=self.state/'incidents';folder.mkdir(mode=0o700,exist_ok=True)
+        stamp=datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')
+        logs=self.compose('logs','--no-color','--timestamps','--since','15m','--tail','250','napcat')
+        native=[]
+        for line in (logs.stdout+'\n'+getattr(logs,'stderr','')).splitlines():
+            if '[QQbotDiag/v1] ' not in line:continue
+            try:row=json.loads(line.split('[QQbotDiag/v1] ',1)[1])
+            except ValueError:continue
+            # Only native enum/boolean fields. Never infer an enum's meaning.
+            if not isinstance(row,dict) or row.get('event')!='qq_kicked_offline':continue
+            clean={k:row[k] for k in ('appId','instanceId','kickedType','securityKickedType',
+                'sessionUptimeSeconds','workerUptimeSeconds') if type(row.get(k)) is int}
+            if type(row.get('sameDevice')) is bool:clean['sameDevice']=row['sameDevice']
+            native.append(clean)
+        identity={}
+        for name in ('machine-id','machine-info'):
+            # Fixed read-only paths, never model-supplied paths or identifiers.
+            command=['docker','compose','--project-name','qqbot-cloud','--project-directory',str(self.root),
+                '--env-file',str(self.root/'.env'),'--env-file',str(self.root/'current/release.env'),
+                '-f',str(self.root/'current/compose.cloud.yaml'),'exec','-T','napcat','sha256sum',
+                '/etc/machine-id' if name=='machine-id' else '/app/.config/QQ/nt_qq/global/nt_data/msf/machine-info']
+            result=self.run(command,check=False)
+            digest=result.stdout.split()
+            if result.returncode==0 and digest and len(digest[0])==64:identity[name]=digest[0]
+        filename='qq-'+stamp+'.json'
+        atomic_json(folder/filename,dict(captured_at=stamp,status=status,identity_sha256=identity,
+            native_kicks=native,napcat_log_tail=(logs.stdout+'\n'+getattr(logs,'stderr',''))[-200000:]))
+        for old in sorted(folder.glob('qq-*.json'))[:-12]:old.unlink()
+        return dict(incident=filename,native_kick_records=len(native))
+
+    def observe_qq(self,status,saved):
+        app=status.get('application',{})
+        online=app.get('qq_connected') is True and app.get('qq_online') is True
+        failed=app.get('reason') in ('qq_login_required','qq_connection_pending')
+        row=saved.setdefault('qq_observation',{})
+        if online:
+            row['state']='online'
+        elif failed and row.get('state')!='offline':
+            snapshot=self.diagnose(status)
+            row.update(state='offline',incident=snapshot['incident'])
+            return True
+        return False
 
     def backup(self):
         backups=self.root/'backups';backups.mkdir(mode=0o700,exist_ok=True)
@@ -189,7 +240,7 @@ def atomic_json(path,value):
 
 def main():
     parser=argparse.ArgumentParser()
-    parser.add_argument('command',choices=['status','watchdog','backup','stop','start','configure-login'])
+    parser.add_argument('command',choices=['status','watchdog','backup','stop','start','configure-login','diagnose'])
     parser.add_argument('--root',default='/opt/qqbot')
     args=parser.parse_args()
     ops=Operations(args.root)
