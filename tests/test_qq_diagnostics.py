@@ -32,6 +32,20 @@ class NativeDiagnosticsTests(unittest.TestCase):
         self.assertEqual(patched,patch_bundle(patched,digest))
         with self.assertRaises(ValueError):patch_bundle(patched+'\n',digest)
 
+    def test_reviewed_41842_profile_uses_its_actual_callback_parameter(self):
+        # Exercise the second profile without weakening production SHA pinning.
+        from unittest.mock import patch
+        import scripts.cloud.napcat_diagnostics as diagnostics
+        source=self.fixture().replace('EM()', 'X9()').replace('(r) =>', '(n) =>')
+        source=source.replace('r.tipsTitle', 'n.tipsTitle').replace('r.tipsDesc', 'n.tipsDesc')
+        digest=hashlib.sha256(source.encode()).hexdigest()
+        with patch.object(diagnostics, 'SOURCE_41842_SHA256', digest):
+            patched=patch_bundle(source)
+            self.assertEqual(patch_bundle(patched), patched)
+        self.assertIn('Number.isSafeInteger(n.kickedType)', patched)
+        self.assertNotIn('r.kickedType', patched)
+        with self.assertRaises(ValueError):patch_bundle(patched+'changed')
+
     @unittest.skipUnless(shutil.which('node'),'Node is needed to execute the native callback fixture')
     def test_real_javascript_callback_preserves_logout_and_excludes_private_fields(self):
         source=self.fixture();patched=patch_bundle(source,hashlib.sha256(source.encode()).hexdigest())
@@ -55,6 +69,18 @@ core.selfInfo={online:true};core.event={emit(...args){emitted.push(args);}};
 
 
 class IncidentTests(unittest.TestCase):
+    def test_identity_snapshot_handles_official_linux_global_migration(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            def run(args, **kwargs):
+                if 'logs' in args:return NS(stdout='', stderr='', returncode=0)
+                if '/nt_qq/global/' in args[-1]:return NS(stdout='', returncode=1)
+                return NS(stdout='a'*64+'  /fixed/path\n', returncode=0)
+            operation=Operations(tmp,run=run)
+            result=operation.diagnose({})
+            row=json.loads((operation.state/'incidents'/result['incident']).read_text())
+            self.assertIn('machine-info-linux', row['identity_sha256'])
+            self.assertNotIn('machine-info-legacy', row['identity_sha256'])
+
     def test_private_bounded_snapshot_and_safe_summary(self):
         with tempfile.TemporaryDirectory() as tmp:
             def run(args,**kwargs):

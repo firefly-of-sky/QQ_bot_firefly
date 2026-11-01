@@ -1,0 +1,9 @@
+# Single-factor access comparison: keep the installed Linux QQ and entrypoint.
+ARG NAPCAT_BASE_IMAGE=qqbot-napcat:4.0.0-amd64
+FROM ${NAPCAT_BASE_IMAGE}
+COPY NapCat.Shell-4.18.42.zip /app/NapCat.Shell.zip
+RUN echo '02e5ff0f79916c1e04c81c1b4590056406fb4293f1f1300c955e71fd08b2829d  /app/NapCat.Shell.zip' | sha256sum -c - \
+    && mkdir -p /app/napcat \
+    && unzip -qo /app/NapCat.Shell.zip -d /app/napcat
+COPY napcat-4.18.42-diagnostic.mjs /app/napcat/napcat.mjs
+RUN python3 -c 'from pathlib import Path; import hashlib; p=Path("/app/napcat"); assert (p/"native").is_dir() and (p/"static").is_dir(); assert hashlib.sha256((p/"napcat.mjs").read_bytes()).hexdigest()=="155c72331575c50609cf562634810b59d3799813b0e91a86ba7f143bc0e4e855"'

@@ -153,12 +153,15 @@ class Operations:
             if type(row.get('sameDevice')) is bool:clean['sameDevice']=row['sameDevice']
             native.append(clean)
         identity={}
-        for name in ('machine-id','machine-info'):
+        for name, fixed_path in (
+            ('machine-id', '/etc/machine-id'),
+            ('machine-info-linux', '/app/.config/QQ/global/nt_data/msf/machine-info'),
+            ('machine-info-legacy', '/app/.config/QQ/nt_qq/global/nt_data/msf/machine-info'),
+        ):
             # Fixed read-only paths, never model-supplied paths or identifiers.
             command=['docker','compose','--project-name','qqbot-cloud','--project-directory',str(self.root),
                 '--env-file',str(self.root/'.env'),'--env-file',str(self.root/'current/release.env'),
-                '-f',str(self.root/'current/compose.cloud.yaml'),'exec','-T','napcat','sha256sum',
-                '/etc/machine-id' if name=='machine-id' else '/app/.config/QQ/nt_qq/global/nt_data/msf/machine-info']
+                '-f',str(self.root/'current/compose.cloud.yaml'),'exec','-T','napcat','sha256sum',fixed_path]
             result=self.run(command,check=False)
             digest=result.stdout.split()
             if result.returncode==0 and digest and len(digest[0])==64:identity[name]=digest[0]
