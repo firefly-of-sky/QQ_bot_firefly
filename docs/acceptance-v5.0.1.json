@@ -19,5 +19,10 @@
   "new_sdk_or_bypass_applied": false,
   "root_cause_confirmed": false,
   "isolation_test_authorized": true,
-  "isolation_test_started": false
+  "isolation_test_started": true,
+  "isolation_test_started_at": "2026-11-01T18:49:12+08:00",
+  "isolation_test_expected_end": "2026-11-01T21:29:12+08:00",
+  "isolation_state": "OBSERVING_WITHOUT_BOT",
+  "qq_online_after_bot_stopped": true,
+  "isolation_result_pending": true
 }
