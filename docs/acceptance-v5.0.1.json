@@ -22,7 +22,25 @@
   "isolation_test_started": true,
   "isolation_test_started_at": "2026-11-01T18:49:12+08:00",
   "isolation_test_expected_end": "2026-11-01T21:29:12+08:00",
-  "isolation_state": "OBSERVING_WITHOUT_BOT",
+  "isolation_state": "QQ_OFFLINE_WITHOUT_BOT",
   "qq_online_after_bot_stopped": true,
-  "isolation_result_pending": true
+  "isolation_result_pending": false,
+  "isolation_elapsed_seconds": 5890,
+  "isolation_native_kick_at": "2026-11-01T20:26:53.938+08:00",
+  "isolation_incident_captured_at": "2026-11-01T20:27:21.232525+08:00",
+  "isolation_bot_resumed_at": "2026-11-01T20:27:22.173092+08:00",
+  "isolation_bot_resumed": true,
+  "qq_online_at_followup": false,
+  "maintenance_marker_cleared": true,
+  "identity_hashes_unchanged": true,
+  "bot_not_required_for_this_failure": true,
+  "native_kick": {
+    "appId": 1001,
+    "sameDevice": false,
+    "kickedType": 0,
+    "securityKickedType": 0,
+    "sessionUptimeSeconds": 5934,
+    "workerUptimeSeconds": 6258
+  },
+  "native_enum_meaning_confirmed": false
 }
