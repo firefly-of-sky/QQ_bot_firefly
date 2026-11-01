@@ -1,5 +1,6 @@
 .env
 config.toml
+tulpa.toml
 data/
 .venv/
 __pycache__/

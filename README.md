@@ -1,101 +1,192 @@
-# QQbot 5.0 · Tulpa 会话与 QQ 自主操作机器人
+# QQbot Firefly
 
-5.0 增加主人专用的 QQ 操作代理：模型按需查询真实 MCP 工具，再执行已授权的好友申请、动态、资料、相册、群管理和消息操作。真实好友申请可触发独立后台任务。操作回执、去重、未知结果保护及暂停状态持久化；普通好友仍只有本私聊权限。开启方法、验收与实际边界见 [5.0 说明](docs/v5.0.0.md)。
+基于 **Tulpa MCP + NapCat + 大模型工具调用** 的 QQ 会话与自主操作机器人。当前版本为 **5.0.0**，支持独立好友会话、图片理解、连续消息合并，以及主人授权的 QQ 账号操作。
 
-4.0 增加独立的云端部署配置、进程与 QQ 就绪状态检查、异常会话恢复、定时备份和版本切换，适配 2 核 4 GiB 服务器。云端安装与日常操作见 [云端运行说明](docs/cloud.md)，实际完成的测试与边界见 [4.0 部署验收](docs/v4.0.0.md)。
+QQbot 负责驱动模型和连接工具；[Tulpa](https://github.com/fumingyang2004/Tulpa) 负责会话、人格、消息批次、权限检查、回复规划、发送队列与回执。模型的普通文字输出不会直接发送到 QQ，回复必须经过框架的规划和发送工具。
 
-4.0.1 的两个延迟实验（精简重复上下文、合并纯文字短回复）在 5.0 中仍默认关闭。对照结果与质量问题见 [实验记录](docs/v4.0.1.md)。
+## 能做什么
 
-当前默认运行时已迁移到 [Tulpa](https://github.com/fumingyang2004/Tulpa) 的真实 MCP 服务。Tulpa 管理会话、人格快照、消息批次、回复规划、权限和发送回执；QQbot 作为常驻外部 Agent 驱动模型，并提供模型配置、QQ 接入及附加工具。
+| 能力 | 说明 |
+| --- | --- |
+| 好友私聊 | 每个好友使用独立会话、上下文和授权，支持重启后接续。 |
+| 文字与图片 | 图片通过工具读取真实像素，再交给支持视觉的模型。 |
+| 连续消息 | 默认停顿 1.2 秒后合并处理，最长收集 4 秒。 |
+| 停止、更正和撤回 | 取消相关推理，发送前重新检查消息是否过时。 |
+| 模型与人格 | 兼容原生 tools/tool_calls 的 Chat Completions API，可配置多个模型和人格文件。 |
+| QQ 自主操作 | 主人可调用好友、消息、互动、资料、空间、群管理、群文件和相册工具，具体取决于接入接口和 QQ 权限。 |
+| 好友申请 | 启用后，真实新申请可触发受限后台任务，由模型决定接受或拒绝。 |
+| 外部 MCP | 按配置发现工具及完整 JSON Schema，无需修改聊天主循环。 |
+| 云端运行 | 提供 Ubuntu 部署脚本、健康检查、异常恢复、定时备份和版本切换。 |
+
+QQ 自主操作**默认关闭**，需要部署者明确登记授权。普通好友无法调用主人专用的账号操作代理。写操作有持久化回执、去重、频率限制和暂停开关；结果为 `UNKNOWN` 时不会自动重发。
+
+## 工作流
 
 ```mermaid
 flowchart LR
-  QQ[好友 QQ] <--> N[NapCat]
-  N <--> R[本机 OneBot 桥接]
-  R <--> T[Tulpa 会话与发送核心]
-  T <-->|MCP| A[常驻模型 Agent]
-  A <--> M[可配置模型]
-  A <--> X[计算 / 时间 / 网页 / 附加 MCP]
+    Q[QQ 好友] <--> N[NapCat / OneBot]
+    N <--> R[QQbot 接入桥]
+    R <--> T[Tulpa 会话与发送核心]
+    T <-->|MCP| A[常驻模型 Agent]
+    A <--> L[模型 API]
+    A <--> X[搜索 / 计算 / 外部 MCP]
+    A --> O[主人专用 QQ 操作代理]
+    O -->|授权检查 / 类型校验 / 回执| T
 ```
 
-与 2.x 的区别：QQ 的发送与会话状态由框架拥有；模型使用发现到的 MCP JSON Schema 工具，必须完成 `plan_chat_reply → send_chat_reply`。增加外部 MCP 服务只需配置，不必修改 Bot 主循环。详情见 [架构](docs/architecture.md)、[3.0 迁移与验收](docs/v3.0.0.md)。
+普通回复使用 `plan_chat_reply → send_chat_reply`。主人执行账号操作时，模型先通过 `qq_tools` 查询实际可用动作和参数，再通过 `qq_execute` 执行；当前私聊的互动仍进入同一回复队列。好友申请后台任务只处理触发事件对应的申请人。
 
-支持好友私聊、文字和图片、连续消息合并、自然停止与更正、独立上下文、主人切换模型、重启接续，以及 Tulpa 的表达学习协议。QQ 自主操作默认关闭，必须由部署者明确登记授权。群聊自动回复未接入；群管理操作与自动群聊是两种能力。Tulpa 当前最多同时运行 8 个会话；普通好友空闲后释放，容量满时回收空闲会话。
+## 快速开始
 
-## 启动
+### 1. 准备环境
 
-需要 Docker、一个机器人 QQ 号、两个账号互加好友，以及支持原生 `tools/tool_calls` 的 Chat Completions 兼容模型 API。
+- Docker 与 Docker Compose。
+- Python 3.12 或更新版本，用于初始化配置和开发。
+- 一个机器人 QQ 账号，以及与它互为好友的主人 QQ 账号。
+- 支持原生工具调用的模型 API；看图还需要模型支持图片输入。
 
 ```bash
+git clone https://github.com/firefly-of-sky/QQ_bot_firefly.git
+cd QQ_bot_firefly
 python3 scripts/init_config.py
-cp tulpa.example.toml tulpa.toml # 首次使用；已有文件请勿覆盖
+cp tulpa.example.toml tulpa.toml
 ```
 
-在本机 `.env` 填写 `OWNER_QQ`（主人账号）、`PRIMARY_API_KEY`；`ONEBOT_TOKEN` 与 `WEBUI_TOKEN` 由初始化脚本生成。不要把密钥发到聊天。`config.toml` 的模型需要准确的 `base_url`、`model` 和 `api_key_env`，并设置 `supports_tools = true`。
+初始化脚本保留已有 `.env` 和 `config.toml`，为首次安装生成随机 OneBot / WebUI Token。已有安装不要覆盖自己的 `tulpa.toml`。
+
+### 2. 配置账号和模型
+
+在 `.env` 中填写 `OWNER_QQ` 和 `PRIMARY_API_KEY`。如需内置网页搜索，可另填 `TAVILY_API_KEY`。生成的 `ONEBOT_TOKEN` 需要与 NapCat 中的配置保持一致。
+
+在 `config.toml` 中设置实际模型：
+
+```toml
+[models.primary]
+base_url = "https://your-provider.example/v1"
+model = "your-exact-model-id"
+api_key_env = "PRIMARY_API_KEY"
+supports_images = true
+supports_tools = true
+```
+
+`base_url` 不包含 `/chat/completions`。按模型实际能力设置图片支持；默认 Tulpa 运行时需要原生工具调用。密钥只放在本地 `.env` 中。
 
 ```bash
 docker compose build bot
 docker compose run --rm --no-deps bot python -m qqbot --check-config
 docker compose run --rm --no-deps bot python -m qqbot --check-model primary
+```
+
+模型连通性检查会调用真实 API，可能产生费用。
+
+### 3. 登录 QQ 并启动
+
+```bash
 docker compose up -d napcat
 ```
 
-在 [NapCat 管理页](http://127.0.0.1:6099/webui/) 扫码登录机器人。网络配置启用正向 WebSocket 服务：容器内监听 `0.0.0.0:3001`，Token 填 `.env` 中的 `ONEBOT_TOKEN`，开启消息段数组和自身消息上报。旧安装继续沿用已有设置，无需重建 NapCat。
+打开 [本机 NapCat 管理页](http://127.0.0.1:6099/webui/)，使用 `.env` 的 `WEBUI_TOKEN` 登录管理页，再用机器人账号的手机 QQ 扫码确认。
+
+在 NapCat 中配置正向 WebSocket：
+
+- 容器内监听 `0.0.0.0:3001`。
+- Token 与 `.env` 的 `ONEBOT_TOKEN` 一致。
+- 开启消息段数组和自身消息上报。
 
 ```bash
 docker compose up -d --no-deps bot
 docker compose logs --tail=40 bot
+docker compose exec bot python -m qqbot.health --status
 ```
 
-出现 `QQbot Tulpa runtime ready` 后，向机器人发送消息。模型检查会产生 API 费用；登录状态通过真实 OneBot 验证。NapCat 离线时暂停发送，不以 Docker 容器运行代替账号在线。
+出现 `QQbot Tulpa runtime ready` 后，从主人 QQ 向机器人发送消息。健康状态中的 `ready=true` 表示 QQ 和框架连接就绪；完整对话仍需要可用的模型服务。
 
-## 聊天与人格
+## 常用命令
 
-- 直接发送文字或图片；连续消息默认停顿 1.2 秒后处理，最长收集 4 秒。
-- “不用查了”或 `/cancel` 停止当前任务；后续更正会使旧回复计划失效。
-- `/status` 查看版本、模型别名与完整模型 ID；`/reset` 删除当前 Tulpa 会话缓存和本私聊历史，重新开始。
-- 主人用 `/qq` 查看可用 QQ 动作，`/autonomy` 查看操作状态，`/autonomy pause`、`/autonomy resume` 暂停或恢复自主操作。暂停期间仍可文字聊天，已在途的操作可能完成。
-- 主人可用 `/models` 和 `/model 别名`。每个好友的会话、模型选择和凭据独立。
-- `persona_file` 指向本地 UTF-8 Markdown，和 `system_prompt` 合计最多 6000 字。Tulpa 保存会话人格快照；修改文件后 `/reset` 应用。也可通过 Tulpa 管理命令选择预设人格。
+| 命令 | 用途 |
+| --- | --- |
+| `/help` | 查看聊天帮助。 |
+| `/status` | 查看版本；主人还可看到模型别名和完整模型 ID。 |
+| `/cancel` 或“不用查了” | 停止当前任务；已发出的消息不能因此撤回。 |
+| `/reset` | 清理本私聊上下文并重新建立会话。 |
+| `/models` | 主人查看模型列表及当前选择。 |
+| `/model 别名` | 主人切换当前会话使用的模型。 |
+| `/qq` | 主人查看各类 QQ 动作的可用数量。 |
+| `/autonomy` | 主人查看自主操作是否暂停及能力数量。 |
+| `/autonomy pause` | 暂停自主操作，仍可文字聊天；在途操作可能完成。 |
+| `/autonomy resume` | 恢复已授权的自主操作。 |
 
-图片由 `read_chat_image` 返回真实像素给模型。当前未提供语音转写和任意文件工具；添加框架权限前应先接入并验证对应外部 Agent 能力。
+`persona_file` 可指向自定义 UTF-8 Markdown 人格文件，容器中的 `personas/` 已挂载。人格文件和 `system_prompt` 合计最多 6000 字；修改后用 `/reset` 应用新的会话人格快照。
 
-## 扩展工具
+## 开启 QQ 自主操作
 
-编辑 `tulpa.toml`，重启 bot。工具从 MCP 服务发现，支持数组、对象及嵌套 JSON Schema。`tools` 可限制暴露的名称；省略表示开放该服务全部工具。只添加你信任并愿意让机器人调用的服务。
+先为**实际安装的 NapCat** 生成接口清单，并将其放入机器人可读取的数据目录。清单生成工具是 `scripts/cloud/capabilities.py`；部署步骤和权限说明见 [5.0 文档](docs/v5.0.0.md)。然后在 `tulpa.toml` 明确登记授权，例如：
 
 ```toml
-[mcp_servers.knowledge]
-url = "https://your-server.example/mcp"
-token_env = "KNOWLEDGE_MCP_TOKEN"
-tools = ["search", "lookup"]
+[autonomy]
+enabled = true
+authorization_id = "owner-consent-v5"
+capabilities_file = "/data/tulpa/provider-actions.json"
+background_friend_requests = true
+writes_per_minute = 10
+background_per_hour = 12
 ```
 
-密钥放 `.env`，模型看到 `knowledge__search` 等工具。非本机服务要求 HTTPS；本机 HTTP 可用于 Docker 容器内服务。当前支持 Streamable HTTP MCP，未实现 stdio、OAuth 交互登录和热增删服务。`auto_search` 关闭内置网页工具，不关闭显式配置的额外 MCP 服务。
+更新已有 `[autonomy]` 配置段，避免重复添加。授权 ID 是部署者的登记标识；相同 ID 不会自动补回管理员撤销的权限。配置后只需重启 bot，再用 `/qq` 核对。
 
-## Tulpa 管理
+动作清单中的“可用”表示接入程序注册了接口，最终还要通过 QQ 账号、目标、群管理员权限和实际回执检查。2026-10-31 的部署检查中，八类框架动作有 54/63 项匹配已安装的 NapCat 注册表，这个数量不代表其他安装环境或每项真实 QQ 操作均已验收。
 
-原框架的终端管理服务在 bot 容器内部 `127.0.0.1:7861`，MCP 在 `127.0.0.1:18777/mcp`，均不暴露到宿主网络。管理凭据与每个好友的 MCP 凭据独立，权限为 `0600`。
+## 云端部署
+
+提供适用于 Ubuntu 22.04、2 核 4 GiB 服务器的独立配置：
+
+- `compose.cloud.yaml`：资源限制、日志轮转、重启策略及进程健康检查。
+- `scripts/cloud/install-host.sh`：Docker、交换空间及宿主准备。
+- `scripts/cloud/package.py`、`activate.sh`：源码打包和版本切换。
+- `scripts/cloud/ops.py`：状态、备份、停止、启动及快捷登录设置。
+- `deploy/systemd/`：进程守护与定时备份。
+
+具体安装、SSH 隧道、数据迁移和回退步骤见 [云端部署说明](docs/cloud.md)。云端部署独立于个人电脑运行；不要把 NapCat、OneBot 或 Tulpa 管理端口开放到公网。
+
+## 能力边界
+
+- 群管理工具与自动群聊回复是不同能力，当前没有自动群聊回复。
+- 支持处理收到的好友申请，尚未接入按任意 QQ 号主动搜索加好友。
+- 当前已验收接入的空间接口支持发布、删除说说；不支持读取动态流、点赞或评论。其他接入版本以实际清单为准。
+- 语音、视频、文件及相册操作受授权和接入方能力限制；语音转写只有接入方实际返回时才可使用。
+- 账号凭据、安全设置和付费 API 不向模型开放；删除主人联系人也交由本人在 QQ 客户端确认。
+- 框架最多同时运行 8 个会话，空闲好友会话可回收；不是无限会话服务。
+- QQ 登录身份可能失效。进程自动重连和快捷登录不能代替账号本人手机确认，Docker `healthy` 也不等于 QQ 在线。
+- 4.0.1 的精简上下文和合并短回复实验，在 5.0 中仍默认关闭。
+
+## 开发与验证
 
 ```bash
-docker compose exec bot python -m qqbot.tulpa.admin status
-docker compose exec bot python -m qqbot.tulpa.admin sessions list
-docker compose exec bot python -m qqbot.tulpa.admin personas
-docker compose exec bot python -m qqbot.tulpa.admin events
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e .
+python -m unittest discover -s tests -q
+
+# 真实 Tulpa MCP，模型与 QQ 均为隔离夹具
+python scripts/verify_qq_operator.py
+
+# 真实模型，QQ 仍为隔离夹具；会产生 API 费用
+python scripts/verify_qq_operator.py --real-model --allow-billable
 ```
 
-更多命令用 `python -m qqbot.tulpa.admin --help` 查看。Tulpa 管理中的内置调查 Agent 模型设置不改变 QQbot 的模型配置；QQbot 模型仍由 `config.toml` 管理。表达学习由框架按真实他人用语收集并校验，外部 Agent 分阶段调用模型；它不是任意事实记忆或完整历史检索。
+5.0 的 Mac 和 amd64 镜像均通过过 163 项回归；真实模型的隔离验收与真实 QQ 操作分别记录在 [5.0 验收记录](docs/acceptance-v5.0.0.json)。真实群管理尚未验收，不能用模拟测试代替实际 QQ 权限检查。
 
-## 数据、验证与回退
+聊天数据库、QQ 登录状态、API 密钥及生成的部署文件保存在本地或服务器的数据目录，未随源码上传。备份可能包含敏感数据，按私有配置保管。项目使用固定的 Tulpa 源码快照，不在启动时拉取上游；来源、版本和本地补丁见 [来源记录](vendor/tulpa-provenance.json)，上游许可见 [Tulpa LICENSE](vendor/tulpa/LICENSE)。
 
-- `bot-data` 卷中保留原 `chat.sqlite3`，新框架数据位于 `/data/tulpa`。迁移不删除旧历史；原私聊历史作为本会话的背景资料。新消息和发送凭据由 Tulpa 持久化。
-- `/reset` 清除该会话上下文，不删除框架审计与独立的语言库；撤回消息从模型后续上下文排除，并取消相关推理。审计保留策略见 [迁移说明](docs/v3.0.0.md)。
-- 源码与 MIT 许可固定在 `vendor/tulpa`，版本及数据路径与虚拟 DNS 补丁记录在 `vendor/tulpa-provenance.json`，不依赖启动时拉取 GitHub。
+## 文档与版本
 
-```bash
-.venv/bin/python -m unittest discover -s tests -q
-# 真实模型 + 真实 Tulpa MCP，QQ 端为隔离夹具；会产生 API 费用
-.venv/bin/python -m scripts.verify_tulpa_model
-```
-
-[2.1 原使用说明](docs/README-2.1.md) 保留用于回退和兼容 CLI。旧版 Git 提交 `aad1f99` 与本机镜像 `qqbot-bot:2.1.0-rollback` 可恢复旧运行时；回退前停止新版，保留两个数据库，禁止同时运行两个回复进程。本机部署依赖 Mac 和本机 Docker 保持运行；云端部署可在 Mac 关机后继续工作，QQ 登录失效仍需本人确认。
+| 文档 | 内容 |
+| --- | --- |
+| [5.0 自主操作](docs/v5.0.0.md) | 授权、工具范围、操作回执、暂停与验收。 |
+| [架构说明](docs/architecture.md) | Tulpa 会话核心和一轮对话的流程。 |
+| [云端运行](docs/cloud.md) | 部署、监控、备份与恢复。 |
+| [4.0 云端版本](docs/v4.0.0.md) | 云端部署验收与边界。 |
+| [4.0.1 延迟实验](docs/v4.0.1.md) | 两项可选优化的对照与质量记录。 |
+| [3.0 框架迁移](docs/v3.0.0.md) | 从旧运行时迁移至真实 Tulpa MCP。 |
+| [2.1 使用说明](docs/README-2.1.md) | 历史版本操作与回退参考。 |
+| [掉线调查](docs/incidents/2026-11-01-qq-offline.md) | 登录身份失效的证据与恢复记录。 |
