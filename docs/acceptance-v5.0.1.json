@@ -1,0 +1,23 @@
+{
+  "version": "5.0.1",
+  "source_commit": "b6b59e5",
+  "qq_webui_api_verified": true,
+  "qq_hostname_preserved": true,
+  "qq_mac_preserved": true,
+  "machine_info_preserved": true,
+  "diagnostic_bundle_sha256": "00babe43a5de5ce64f917e7ebc085fbae06f6e86fddf243e6e4e885fbd6b7b87",
+  "bot_image": "sha256:1cb46aaf90a296701969560185c4a54bf7de94d760a883d2f84f1e3f9032eb93",
+  "qq_image": "sha256:9310410ec620b7b4ff6b2be8abd1dd8ac9d84c5a6386f2667a4c4b2ebe64ae11",
+  "qq_runtime_version": "3.2.34-53644",
+  "napcat_version": "4.18.37",
+  "mac_regression_passed": 171,
+  "amd64_tests_run": 171,
+  "amd64_passed": 170,
+  "amd64_skipped": 1,
+  "actual_compiled_callback_test_passed": true,
+  "fresh_container_api_smoke_passed": true,
+  "new_sdk_or_bypass_applied": false,
+  "root_cause_confirmed": false,
+  "isolation_test_authorized": true,
+  "isolation_test_started": false
+}
