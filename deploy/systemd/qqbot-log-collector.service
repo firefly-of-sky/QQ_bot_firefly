@@ -1,0 +1,12 @@
+[Unit]
+Description=QQbot private status and incremental log collector
+After=docker.service
+Requires=docker.service
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/qqbot
+ExecStart=/usr/bin/python3 /opt/qqbot/current/scripts/cloud/collect_qq.py
+TimeoutStartSec=150
+UMask=0077
+Nice=10
+IOSchedulingClass=idle

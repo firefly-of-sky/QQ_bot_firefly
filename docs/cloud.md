@@ -84,3 +84,7 @@ Docker `unless-stopped` 处理进程退出和宿主重启；systemd 每分钟检
 ## 验收
 
 部署完成前逐项确认：镜像为服务器架构、模型检查、QQ 登录与好友权限、文字/图片/连续消息、取消与会话恢复、重启接续、容器退出恢复、服务器重启恢复、备份恢复，以及公网没有管理端口暴露。记录验证结果时区分模拟端、真实模型与真实 QQ。
+
+## 定时日志采集
+
+服务器每分钟采集状态和增量日志，压缩轮转并私有保留，不依赖 Mac 或 Codex 持续运行。查看安全摘要可执行 `python3 /opt/qqbot/current/scripts/cloud/collect_qq.py --summary`。采集边界、容量限制及六小时观察结果说明见 [云端日志采集](cloud-log-collection.md)。

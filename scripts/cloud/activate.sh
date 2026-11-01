@@ -39,6 +39,6 @@ if ! compose up -d --no-build --pull never; then
 fi
 install -m 0644 "$release"/deploy/systemd/qqbot-*.service "$release"/deploy/systemd/qqbot-*.timer /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable --now qqbot-watchdog.timer qqbot-backup.timer
+systemctl enable --now qqbot-watchdog.timer qqbot-backup.timer qqbot-log-collector.timer
 rm -f "$root/run/maintenance"
 printf 'release_started=%s; verify readiness and QQ login separately\n' "$(basename "$release")"
