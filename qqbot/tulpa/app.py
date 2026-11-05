@@ -14,6 +14,7 @@ from .backend import Backend
 from .relay import Relay
 from .runner import Conversation
 from .settings import load_settings
+from .profile import ProfileMemory
 
 log = logging.getLogger(__name__)
 
@@ -25,6 +26,7 @@ class Application:
         self.transport = OneBot(http,cfg.ws_url,cfg.token)
         self.relay = Relay(self.transport)
         self.store = Store(cfg.database)
+        self.profiles = ProfileMemory(self)
         self.slots = asyncio.Semaphore(cfg.max_concurrent_requests)
         self.conversations = {}
         self.rotate = set()
@@ -96,7 +98,7 @@ class Application:
             conversation = self.conversations.get(cid)
             if conversation:
                 conversation.interrupt()
-                self.store.recall(conversation.key,event.get('message_id'))
+            self.store.recall('private:'+cid.replace(':direct:',':'),event.get('message_id'))
             return
         if event.get('post_type')!='message' or event.get('message_type')!='private' or event.get('sub_type')!='friend':
             return
@@ -208,4 +210,5 @@ class Application:
                 await self.backend.close()
             await self.relay.close()
             await self.health.close()
+            await self.profiles.close()
             self.store.close()

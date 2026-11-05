@@ -16,6 +16,11 @@ class Store:
             CREATE TABLE IF NOT EXISTS turn_sources (turn_id INTEGER, session TEXT, message_id TEXT);
             CREATE INDEX IF NOT EXISTS source_lookup ON turn_sources(session,message_id);
             CREATE TABLE IF NOT EXISTS seen (id TEXT PRIMARY KEY, created REAL NOT NULL);
+            CREATE TABLE IF NOT EXISTS profile_epochs (session TEXT PRIMARY KEY, revision INTEGER NOT NULL DEFAULT 0);
+            CREATE TABLE IF NOT EXISTS user_profiles (session TEXT, slot TEXT, value TEXT, kind TEXT,
+                confidence TEXT, updated REAL, PRIMARY KEY(session,slot));
+            CREATE TABLE IF NOT EXISTS profile_sources (session TEXT, slot TEXT, message_id TEXT,
+                PRIMARY KEY(session,slot,message_id));
         ''')
 
     def claim(self, event_id: str) -> bool:
@@ -35,6 +40,9 @@ class Store:
             self.db.execute("DELETE FROM turns WHERE id IN (SELECT turn_id FROM turn_sources WHERE session=? AND message_id=?)",
                             (session, str(message_id)))
             self.db.execute("DELETE FROM turn_sources WHERE turn_id NOT IN (SELECT id FROM turns)")
+            self.db.execute('DELETE FROM user_profiles WHERE session=? AND slot IN (SELECT slot FROM profile_sources WHERE session=? AND message_id=?)',
+                            (session,session,str(message_id)))
+            self.db.execute('DELETE FROM profile_sources WHERE session=? AND slot NOT IN (SELECT slot FROM user_profiles WHERE session=?)',(session,session))
 
     def source_ids(self, session):
         return {row[0] for row in self.db.execute("SELECT message_id FROM turn_sources WHERE session=?", (session,))}
@@ -72,3 +80,32 @@ class Store:
 
     def close(self):
         self.db.close()
+
+    def profile_revision(self, session):
+        row=self.db.execute('SELECT revision FROM profile_epochs WHERE session=?',(session,)).fetchone()
+        return row[0] if row else 0
+
+    def profile(self, session):
+        rows=self.db.execute('SELECT slot,value,kind,confidence,updated FROM user_profiles WHERE session=? ORDER BY updated DESC,slot',(session,)).fetchall()
+        return [dict(key=k,value=v,kind=t,confidence=c,updated_at=u) for k,v,t,c,u in rows]
+
+    def save_profile(self, session, revision, updates):
+        if revision!=self.profile_revision(session):return False
+        with self.db:
+            for row in updates:
+                if any(self.is_recalled(session,source) for source in row['sources']):continue
+                old=self.db.execute('SELECT confidence FROM user_profiles WHERE session=? AND slot=?',(session,row['key'])).fetchone()
+                if old and old[0]=='explicit' and row['confidence']=='tentative':continue
+                self.db.execute('INSERT OR REPLACE INTO user_profiles VALUES (?,?,?,?,?,?)',
+                    (session,row['key'],row['value'],row['kind'],row['confidence'],time.time()))
+                self.db.execute('DELETE FROM profile_sources WHERE session=? AND slot=?',(session,row['key']))
+                self.db.executemany('INSERT OR IGNORE INTO profile_sources VALUES (?,?,?)',[(session,row['key'],str(s)) for s in row['sources']])
+            self.db.execute('DELETE FROM user_profiles WHERE session=? AND slot NOT IN (SELECT slot FROM user_profiles WHERE session=? ORDER BY updated DESC,slot LIMIT 32)',(session,session))
+            self.db.execute('DELETE FROM profile_sources WHERE session=? AND slot NOT IN (SELECT slot FROM user_profiles WHERE session=?)',(session,session))
+        return True
+
+    def forget_profile(self, session):
+        with self.db:
+            self.db.execute('INSERT INTO profile_epochs VALUES (?,1) ON CONFLICT(session) DO UPDATE SET revision=revision+1',(session,))
+            self.db.execute('DELETE FROM user_profiles WHERE session=?',(session,))
+            self.db.execute('DELETE FROM profile_sources WHERE session=?',(session,))

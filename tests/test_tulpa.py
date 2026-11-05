@@ -274,7 +274,7 @@ class TulpaAuthorization(unittest.IsolatedAsyncioTestCase):
             ModelReply(calls=(ToolCall('image','read_chat_image','{"event_id":1}'),
                               ToolCall('math','calculate','{"expression":"1+1"}'))),
             ModelReply(calls=(ToolCall('done','plan_chat_reply','{"action":"silence","intent":"fixture"}'),))]))
-        store=SimpleNamespace(history=lambda *args:[],append=Mock())
+        store=SimpleNamespace(history=lambda *args:[],profile=lambda *args:[],append=Mock())
         conversation=Conversation(SimpleNamespace(cfg=cfg,llm=llm,store=store),'456:direct:123',{})
         conversation.sid='a'*32;conversation.extensions={}
         calls=[]
