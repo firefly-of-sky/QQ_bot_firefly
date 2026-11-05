@@ -27,8 +27,16 @@
   "maintenance_cleared": true,
   "qq_online_after_switch": false,
   "application_ready_after_switch": false,
-  "login_and_online_duration_validation_pending": true,
+  "login_and_online_duration_validation_pending": false,
   "root_cause_confirmed": false,
   "long_term_fix_proven": false,
-  "mac_full_regression_passed": 173
+  "mac_full_regression_passed": 173,
+  "comparison_outcome": "QQ_OFFLINE",
+  "first_ready_at": "2026-11-01T22:43:30.801010+08:00",
+  "offline_detected_at": "2026-11-02T00:10:20.638013+08:00",
+  "native_kick_at": "2026-11-02T00:09:50.879+08:00",
+  "native_session_uptime_seconds": 5706,
+  "observation_window_passed": false,
+  "machine_info_bytes_preserved_at_failure": true,
+  "incident": "qq-20261101T161022564105Z.json"
 }
