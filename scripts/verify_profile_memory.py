@@ -44,12 +44,13 @@ async def main(real=False):
     await remote.emit('我平时最喜欢先给结论再简短解释，请把这当作长期沟通偏好。')
     await until(lambda:bool(app.store.profile(c.key)),timeout=90)
     assert any(r['kind']=='preference' for r in app.store.profile(c.key))
-    old=c.sid;await remote.emit('/new');await until(lambda:c.sid!=old,timeout=30)
+    old=c.sid;cid=c.cid;await remote.emit('/new');await until(lambda:app.conversations[cid].sid not in (None,old),timeout=30);c=app.conversations[cid]
     assert app.store.history(c.key,20)==[] and app.store.profile(c.key)
     seen.clear();before=len(remote.sent);await remote.emit('按我平时的习惯解释一下什么是光合作用。');await until(lambda:len(remote.sent)>before,timeout=90)
     assert any(p.get('user_profile') for p in seen)
     assert not app.store.profile('private:456:124')
-    old=c.sid;await remote.emit('/forget');await until(lambda:c.sid!=old,timeout=30)
+    await until(lambda:c.turn_task is None,timeout=30)
+    old=c.sid;await remote.emit('/forget');await until(lambda:app.conversations[cid].sid not in (None,old),timeout=30);c=app.conversations[cid]
     await app.profiles.flush(c.key);assert not app.store.profile(c.key)
     print(json.dumps({'real_model':real,'profile_distilled':True,'new_window_rotated':True,'short_context_cleared':True,'profile_used_after_new_window':True,'other_friend_isolated':True,'forget_cleared_profile':True,'real_qq_messages_sent':False}))
    finally:
