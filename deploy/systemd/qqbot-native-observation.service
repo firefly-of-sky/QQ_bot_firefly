@@ -1,0 +1,11 @@
+[Unit]
+Description=Read-only native QQ control observation
+After=docker.service
+Requires=docker.service
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/qqbot
+ExecStart=/usr/bin/python3 /opt/qqbot/current/scripts/cloud/sample_native_qq.py
+TimeoutStartSec=90
+UMask=0077
+Nice=10

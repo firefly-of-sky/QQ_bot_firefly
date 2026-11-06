@@ -192,3 +192,5 @@ python scripts/verify_qq_operator.py --real-model --allow-billable
 | [3.0 框架迁移](docs/v3.0.0.md) | 从旧运行时迁移至真实 Tulpa MCP。 |
 | [2.1 使用说明](docs/README-2.1.md) | 历史版本操作与回退参考。 |
 | [掉线调查](docs/incidents/2026-11-01-qq-offline.md) | 登录身份失效的证据与恢复记录。 |
+
+原生 QQ 与 SnowLuma 分时掉线对照见 [实验记录](docs/experiments/2026-11-06-native-snowluma.md)，该记录区分正在观察、已经验证的结果和候选接入方案。

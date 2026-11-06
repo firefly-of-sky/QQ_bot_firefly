@@ -1,0 +1,10 @@
+[Unit]
+Description=Sample native QQ control every minute
+[Timer]
+OnBootSec=120
+OnUnitActiveSec=60
+RandomizedDelaySec=2
+AccuracySec=1s
+Persistent=true
+[Install]
+WantedBy=timers.target
